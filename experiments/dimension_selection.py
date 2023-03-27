@@ -50,7 +50,7 @@ data = pd.DataFrame(
 #res = Parallel(n_jobs=-1)(delayed(kfold_selection)(Y, d) for d in range(1, 11))
 #data = pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik', 'auc'])
 
- Spike-and-Slab Variable Selection
+# Spike-and-Slab Variable Selection
 model = GLNEM(family=family, link=link, n_features=8, random_state=123)
 
 model.sample(Y, n_warmup=2500, n_samples=2500)
