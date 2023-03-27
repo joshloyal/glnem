@@ -13,7 +13,7 @@ from joblib import Parallel, delayed
 
 from glnem import GLNEM
 from glnem.datasets import synthetic_network
-from dyneigenmodel.model_selection import train_test_split, kfold
+from dyneigenmodel.model_selection import kfold
 
 
 set_host_device_count(10)
