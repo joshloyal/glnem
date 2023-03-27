@@ -1,9 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-
-import dyneigenmodel.static_gof as sgof
-import dyneigenmodel.dynamic_gof as dgof
 import scipy.stats as stats
 
 from sklearn.metrics import roc_curve, roc_auc_score
@@ -12,8 +9,8 @@ from statsmodels.graphics.gofplots import qqplot
 
 from .diagnostics import quantile_residuals
 from .network_utils import adjacency_to_vec, dynamic_adjacency_to_vec
-from .static_gof import density, std_degree, transitivity
-from .static_gof import degree, degree_distribution
+from .gof import density, std_degree, transitivity
+from .gof import degree, degree_distribution
 
 
 BOXPLOT_PROPS = {
@@ -92,8 +89,8 @@ def plot_glnem(glnem, Y_obs=None, **fig_kwargs):
 
     if glnem.family == 'bernoulli':
         stats = {
-            'density': sgof.density,
-            'transitivity': sgof.transitivity
+            'density': density,
+            'transitivity': transitivity
         }
         names = ['F', 'G']
         for k, (key, stat_func) in zip(names, stats.items()):
@@ -104,13 +101,13 @@ def plot_glnem(glnem, Y_obs=None, **fig_kwargs):
             ax[k].set_xlabel(key)
 
         # degree distribution
-        degrees = glnem.posterior_predictive(sgof.degree)
+        degrees = glnem.posterior_predictive(degree)
         max_degree = np.max(degrees) + 1
-        deg_dist = sgof.degree_distribution(degrees)
+        deg_dist = degree_distribution(degrees)
         sns.boxplot(x='degree', y='count', data=deg_dist, color='w', fliersize=0,
                     ax=ax['H'], **BOXPLOT_PROPS)
         ax['H'].plot(
-            np.bincount(sgof.degree(y_vec).ravel(), minlength=max_degree + 1),
+            np.bincount(degree(y_vec).ravel(), minlength=max_degree + 1),
             'k-', linewidth=3)
 
         # 95% credible intervals
