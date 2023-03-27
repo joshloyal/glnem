@@ -250,10 +250,10 @@ def glnem(Y, Z, n_nodes, train_indices,
 class GLNEM(object):
     """Generalized Linear Network Eigenmodel"""
     def __init__(self,
-                 n_features=2,
+                 n_features=8,
                  family='bernoulli',
                  link='logit',
-                 infer_dimension=False,
+                 infer_dimension=True,
                  infer_sigma=True,
                  tweedie_var_power=None,
                  v0=0.,

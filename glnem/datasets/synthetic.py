@@ -11,7 +11,7 @@ from ..tweedie import Tweedie
 from ..network_utils import vec_to_adjacency
 
 
-__all__ = ['tweedie_network', 'count_network']
+__all__ = ['synthetic_network']
 
 
 def centered_qr_decomposition(X):
@@ -44,19 +44,22 @@ def mixture_latent_space(n_nodes, n_features=3, random_state=123):
 
 def generate_systematic_component(
         n_nodes=100, n_features=3, n_covariates=2, intercept=1.,
-        link='log', random_state=123):
+        family='bernoulli', random_state=123):
     rng = check_random_state(random_state)
      
     U, c = mixture_latent_space(n_nodes, n_features, rng)
     
     # eigenvalues
     z = rng.choice([-n_nodes, n_nodes], size=U.shape[1])
-    if link == 'log':
+    if family in ['poisson', 'negbinom']:
         z = 0.5 * z
+    elif family in ['tweedie']:
+        z = 0.25 * z
 
     #lmbda = 0.25 * z  + np.sqrt(n_nodes / 4) * rng.randn(U.shape[1])
     #lmbda = 0.5 * z  + np.sqrt(n_nodes / 4) * rng.randn(U.shape[1])
     lmbda = z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
+    #lmbda = 0.5 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
     
     # covariates
     if n_covariates is not None and n_covariates > 1:
@@ -136,7 +139,7 @@ def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, interce
     
     eta, X, params = generate_systematic_component(
             n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
-            intercept=intercept, link=link, random_state=random_state)
+            intercept=intercept, family=family, random_state=random_state)
 
     mu = LINK_FUNCS[link](eta)
     params['mu'] = mu
