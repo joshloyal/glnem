@@ -51,15 +51,10 @@ def generate_systematic_component(
     
     # eigenvalues
     z = rng.choice([-n_nodes, n_nodes], size=U.shape[1])
-    if family in ['poisson', 'negbinom']:
-        z = 0.5 * z
-    elif family in ['tweedie']:
-        z = 0.25 * z
-
-    #lmbda = 0.25 * z  + np.sqrt(n_nodes / 4) * rng.randn(U.shape[1])
-    #lmbda = 0.5 * z  + np.sqrt(n_nodes / 4) * rng.randn(U.shape[1])
-    lmbda = z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
-    #lmbda = 0.5 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
+    if family in ['poisson', 'negbinom', 'tweedie']:
+        lmbda = 0.5 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
+    else:
+        lmbda = z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
     
     # covariates
     if n_covariates is not None and n_covariates > 1:

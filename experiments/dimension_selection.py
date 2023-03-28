@@ -13,7 +13,7 @@ from joblib import Parallel, delayed
 
 from glnem import GLNEM
 from glnem.datasets import synthetic_network
-from dyneigenmodel.model_selection import kfold
+from glnem.model_selection import kfold
 
 
 set_host_device_count(10)
@@ -39,12 +39,12 @@ def ic_selection(Y, n_features):
 
 Y, X, params = synthetic_network(n_nodes=75, family=family, link=link,
         intercept=0, n_features=3, n_covariates=4, random_state=1,
-        dispersion=dispersion, var_power=1.7)
+        dispersion=dispersion, var_power=1.6)
 
 ## information criteria
-res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, d) for d in range(1, 9))
-data = pd.DataFrame(
-    np.asarray(res), columns=['n_features', 'waic', 'dic', 'aic', 'bic'])
+#res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, d) for d in range(1, 9))
+#data = pd.DataFrame(
+#    np.asarray(res), columns=['n_features', 'waic', 'dic', 'aic', 'bic'])
 
 ## cross-validation
 #res = Parallel(n_jobs=-1)(delayed(kfold_selection)(Y, d) for d in range(1, 11))
