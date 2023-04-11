@@ -76,7 +76,8 @@ def generate_systematic_component(
             'lambda': lmbda,
             'U': U,
             'coefs': coefs,
-            'z': c
+            'z': c,
+            'linear_predictor': eta
     }
     
     return eta, X, params
@@ -130,7 +131,7 @@ def count_network(n_nodes=100, n_features=2, n_covariates=2, intercept=2.5, disp
 
 def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, intercept=1., 
                       family='bernoulli', link='logit', dispersion=None, 
-                      var_power=1.2, random_state=123):
+                      var_power=1.2, zif_proba=0.1, random_state=123):
     
     eta, X, params = generate_systematic_component(
             n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
@@ -139,7 +140,8 @@ def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, interce
     mu = LINK_FUNCS[link](eta)
     params['mu'] = mu
     dist = get_distribution(
-            mu, dispersion=dispersion, var_power=var_power, family=family)
+            mu, dispersion=dispersion, var_power=var_power, family=family,
+            zif_proba=zif_proba)
 
     rng_key = PRNGKey(random_state)
     y_vec = dist.sample(rng_key)

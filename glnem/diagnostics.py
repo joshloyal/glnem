@@ -36,7 +36,7 @@ def quantile_residuals(y, y_hat, dispersion=0., var_power=1.5, family='poisson',
     return norm.ppf(rng.uniform(lower, upper))
 
 
-def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli'):
+def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_proba=0.1):
 
     if family == 'bernoulli':
         dis = dist.Bernoulli(mu)
@@ -46,6 +46,8 @@ def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli'):
         dis = Tobit(mu, dispersion=dispersion)
     elif family == 'poisson':
         dis = dist.Poisson(mu)
+    elif family == 'zif_poisson':
+        dis = dist.ZeroInflatedPoisson(gate=zif_proba, rate=mu)
     elif family == 'negbinom':
         dis = dist.NegativeBinomial2(mean=mu, concentration=1/dispersion)
     elif family == 'normal':

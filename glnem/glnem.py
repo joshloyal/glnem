@@ -51,6 +51,11 @@ def predict(model, rng_key, samples, *model_args, **model_kwargs):
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     return model_trace["mean"]["value"]
 
+def linear_predictor(model, rng_key, samples, *model_args, **model_kwargs):
+    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
+    return model_trace["linear_predictor"]["value"]
+
 
 def predict_zero_probas(model, rng_key, samples, *model_args, **model_kwargs):
     model = handlers.substitute(handlers.seed(model, rng_key), samples)
@@ -499,6 +504,17 @@ class GLNEM(object):
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
     
+    def linear_predictor(self, random_state=42):
+        rng_key = random.PRNGKey(random_state)
+        n_samples  = self.samples_['U'].shape[0]
+        vmap_args = (self.samples_, random.split(rng_key, n_samples))
+
+        return np.asarray(vmap(
+            lambda samples, rng_key : linear_predictor(
+                glnem, rng_key, samples,
+                *self.model_args_, **self.model_kwargs_)
+        )(*vmap_args).mean(axis=0))
+
     def predict_zero_probas(self, random_state=42):
         rng_key = random.PRNGKey(random_state)
         n_samples  = self.samples_['U'].shape[0]
