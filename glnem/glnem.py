@@ -11,6 +11,7 @@ from numpyro.contrib.control_flow import scan
 from numpyro.distributions import constraints
 from numpyro.distributions.transforms import OrderedTransform
 from numpyro.infer import MCMC, NUTS, DiscreteHMCGibbs, MixedHMC, HMC, HMCGibbs
+from numpyro.infer.util import log_density
 from numpyro.infer import init_to_value, init_to_uniform, init_to_feasible, init_to_median
 from numpyro.infer import SVI, Trace_ELBO, autoguide
 from numpyro.diagnostics import print_summary as numpyro_print_summary
@@ -23,12 +24,14 @@ from sklearn.utils import check_random_state
 from .tweedie import Tweedie, Chi2ZeroDoF
 from .tobit import Tobit
 from .mcmc_utils import Phi, polar_decomposition, centered_qr_decomposition
+from .mcmc_utils import condition
 from .network_utils import adjacency_to_vec
 from .plots import plot_glnem
 from .diagnostics import get_distribution
 
 
 __all__ = ['GLNEM']
+
 
 
 def find_permutation(U, U_ref):
@@ -41,49 +44,38 @@ def find_permutation(U, U_ref):
 
 def posterior_predictive(model, rng_key, samples, stat_fun, *model_args,
                          **model_kwargs):
-    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    #model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model = handlers.seed(condition(model, samples), rng_key)
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     return stat_fun(model_trace["Y"]["value"])
 
 
 def predict(model, rng_key, samples, *model_args, **model_kwargs):
-    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model = handlers.seed(condition(model, samples), rng_key)
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     return model_trace["mean"]["value"]
 
+
 def linear_predictor(model, rng_key, samples, *model_args, **model_kwargs):
-    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    #model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model = handlers.seed(condition(model, samples), rng_key)
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     return model_trace["linear_predictor"]["value"]
 
 
 def predict_zero_probas(model, rng_key, samples, *model_args, **model_kwargs):
-    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    #model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model = handlers.seed(condition(model, samples), rng_key)
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     return model_trace["zero_probas"]["value"]
 
 
 def log_likelihood(model, rng_key, samples, *model_args, **model_kwargs):
-    model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    #model = handlers.substitute(handlers.seed(model, rng_key), samples)
+    model = handlers.seed(condition(model, samples), rng_key)
     model_trace = handlers.trace(model).get_trace(*model_args, **model_kwargs)
     obs_node = model_trace["Y"]
     return obs_node["fn"].log_prob(obs_node["value"])
-
-
-
-def calculate_posterior_predictive(mcmc, stat_fun, random_state, *model_args,
-                                   **model_kwargs):
-    rng_key = random.PRNGKey(random_state)
-
-    samples = mcmc.get_samples()
-    n_samples  = samples['U'].shape[0]
-    vmap_args = (samples, random.split(rng_key, n_samples))
-
-    return vmap(
-        lambda samples, rng_key : posterior_predictive(
-            model, rng_key, samples, stat_fun,
-            *model_args, **model_kwargs)
-    )(*vmap_args)
 
 
 def print_summary(glnem, samples, feature_names, divergences, prob=0.9):
@@ -245,11 +237,12 @@ def glnem(Y, Z, n_nodes, train_indices,
             else:
                 y = numpyro.sample("Y", dist.Normal(mu, dispersion))
 
-        if is_predictive:
-            numpyro.deterministic("linear_predictor", eta)
-            numpyro.deterministic("mean", mu)
-            numpyro.deterministic("zero_probas", 
-                    calculate_zero_probas(mu, family, dispersion, var_power))
+    if is_predictive:
+        mu = LINK_FUNCS[link](eta)
+        numpyro.deterministic("linear_predictor", eta)
+        numpyro.deterministic("mean", mu)
+        numpyro.deterministic("zero_probas", 
+                calculate_zero_probas(mu, family, dispersion, var_power))
 
 
 class GLNEM(object):
@@ -345,6 +338,13 @@ class GLNEM(object):
         # extract/process samples
         self.samples_ = mcmc.get_samples()
 
+        # calculate log density
+        self.logp_ = vmap(
+            lambda sample : log_density(
+                glnem, model_args=model_args, model_kwargs=model_kwargs,
+                params=sample)[0])(self.samples_)
+        self.map_idx_ = np.argmax(self.logp_)
+
         self.samples_ = jax.tree_map(lambda x : np.array(x), self.samples_)
         
         # save covariate effects
@@ -361,7 +361,7 @@ class GLNEM(object):
             self.dispersion_ = None
 
         # fix permutation issue for each sample
-        U_ref = self.samples_['U'][-1]
+        U_ref = self.samples_['U'][self.map_idx_]
         for idx in range(self.samples_['U'].shape[0]):
             self.samples_['U'][idx], perm = find_permutation(
                 self.samples_['U'][idx], U_ref)

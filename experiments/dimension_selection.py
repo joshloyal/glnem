@@ -14,14 +14,15 @@ from joblib import Parallel, delayed
 from glnem import GLNEM
 from glnem.glnem import find_permutation
 from glnem.datasets import synthetic_network
+from glnem.network_utils import adjacency_to_vec
 from glnem.model_selection import kfold
 
 
 set_host_device_count(10)
 numpyro.enable_x64()
 
-family = 'negbinom'
-link = 'log'
+family = 'bernoulli'
+link = 'logit'
 dispersion = 0.5
 
 
@@ -50,7 +51,7 @@ def ic_selection(Y, n_features):
 
 
 Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
-        intercept=-1.0, n_features=3, n_covariates=None, random_state=0,
+        intercept=-1.0, n_features=3, n_covariates=4, random_state=1,
         dispersion=dispersion, var_power=1.6)
 print(Y.mean())
 
@@ -64,7 +65,7 @@ print(Y.mean())
 #data = pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik', 'auc'])
 
 # Spike-and-Slab Variable Selection
-model = GLNEM(family=family, link=link, n_features=8, random_state=123)
+model = GLNEM(family=family, link=link, n_features=8, random_state=82590)
 
 model.sample(Y, X=X, n_warmup=2500, n_samples=2500)
 
@@ -101,9 +102,34 @@ eta = params['linear_predictor']
 eta_pred = model.linear_predictor()
 data['linear_predictor_rel'] = np.sum((eta_pred - eta) ** 2) / np.sum(eta ** 2)
 
+eta2 = model.intercept_ + (model.U_ * model.lambda_) @ model.U_.T
+subdiag = np.tril_indices_from(eta2, k=-1)
+eta2 = eta2[subdiag] + X @ model.coefs_
+data['linear_predictor_rel2'] = np.sum((eta2 - eta) ** 2) / np.sum(eta ** 2)
+
+
 # intercept
 data['intercept_rel'] = np.sqrt((model.intercept_ - params['intercept']) ** 2) 
 
 # regression coefficients
 for p in range(X.shape[1]):
     data[f'coef{p}_rel'] = np.sqrt((model.coefs_[p] - params['coefs'][p]) ** 2) 
+
+
+# auc
+y = adjacency_to_vec(Y)
+mu = model.predict()
+#probas = expit(eta2)
+#data['auc'] = roc_auc_score(y, mu)
+# calculate posterior mean of linear predictor by hand...
+#eta2 = 0
+#n_samples = model.samples_['U'].shape[0]
+#for idx in range(n_samples):
+#    out = model.samples_['intercept'][idx] + (model.samples_['U'][idx] * model.samples_['lambda'][idx]) @ model.samples_['U'][idx].T
+#    out = out[subdiag] + X @ model.samples_['coefs'][idx]
+#    eta2 += out / n_samples
+#print(np.sum((eta2 - eta) ** 2) / np.sum(eta ** 2))
+#
+#mu = np.exp(eta2)
+# correlation coefficient
+data['corr'] = np.corrcoef(params['mu'], mu)[0, 1]
