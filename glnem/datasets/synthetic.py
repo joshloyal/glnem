@@ -67,7 +67,9 @@ def generate_systematic_component(
         coefs = None
     
     subdiag = np.tril_indices(n_nodes, k=-1)
-    eta = intercept + (U @ (lmbda * U).T)[subdiag]
+
+    ULUt = ((U * lmbda) @ U.T)[subdiag]
+    eta = intercept + ULUt 
     if X is not None:
         eta += X @ coefs
     
@@ -77,6 +79,7 @@ def generate_systematic_component(
             'U': U,
             'coefs': coefs,
             'z': c,
+            'similarities': ULUt, 
             'linear_predictor': eta
     }
     

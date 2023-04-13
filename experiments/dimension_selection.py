@@ -21,8 +21,8 @@ from glnem.model_selection import kfold
 set_host_device_count(10)
 numpyro.enable_x64()
 
-family = 'bernoulli'
-link = 'logit'
+family = 'poisson'
+link = 'log'
 dispersion = 0.5
 
 
@@ -50,8 +50,8 @@ def ic_selection(Y, n_features):
 
 
 
-Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
-        intercept=-1.0, n_features=3, n_covariates=4, random_state=1,
+Y, X, params = synthetic_network(n_nodes=200, family=family, link=link,
+        intercept=-1.0, n_features=3, n_covariates=4, random_state=0,
         dispersion=dispersion, var_power=1.6)
 print(Y.mean())
 
@@ -133,3 +133,6 @@ mu = model.predict()
 #mu = np.exp(eta2)
 # correlation coefficient
 data['corr'] = np.corrcoef(params['mu'], mu)[0, 1]
+
+sims = model.similarities()
+data['sim_rel'] = np.sum((sims - params['similarities']) ** 2) / np.sum(params['similarities'] ** 2)
