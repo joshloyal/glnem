@@ -21,8 +21,8 @@ from glnem.model_selection import kfold
 set_host_device_count(10)
 numpyro.enable_x64()
 
-family = 'poisson'
-link = 'log'
+family = 'bernoulli'
+link = 'logit'
 dispersion = 0.5
 
 
@@ -36,7 +36,7 @@ def compare_latent_space(U_pred, U_true):
     return corr, mse, perm
 
 
-def ic_selection(Y, n_features):
+def ic_selection(Y, X, n_features):
 
     # fit model
     model = GLNEM(
@@ -44,19 +44,19 @@ def ic_selection(Y, n_features):
             infer_dimension=False, 
             n_features=n_features)
 
-    model.sample(Y, n_warmup=2500, n_samples=2500)
+    model.sample(Y, X=X, n_warmup=2500, n_samples=2500)
 
     return n_features, model.waic(), model.dic(), model.aic(), model.bic()
 
 
 
-Y, X, params = synthetic_network(n_nodes=150, family=family, link=link,
+Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
         intercept=-1.0, n_features=3, n_covariates=4, random_state=0,
         dispersion=dispersion, var_power=1.6)
 print(Y.mean())
 
 ## information criteria
-res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, d) for d in range(1, 9))
+res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, X, d) for d in range(1, 9))
 data = pd.DataFrame(
     np.asarray(res), columns=['n_features', 'waic', 'dic', 'aic', 'bic'])
 

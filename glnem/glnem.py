@@ -292,7 +292,7 @@ class GLNEM(object):
         """
         # of U params, Lambda Params, Intercept, and Coefficients.
         """
-        n_covariates = self.coefs_.shape[0] if self.coefs_ else 0
+        n_covariates = self.coefs_.shape[0] if self.coefs_ is not None else 0
         return (
                 np.prod(self.U_.shape) +    # latent space
                 self.n_features +           # lambda 
@@ -521,7 +521,7 @@ class GLNEM(object):
         subdiag = np.tril_indices(n_nodes, k=-1)
         eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[subdiag]
         if X is not None:
-            eta += Z @ self.coefs_
+            eta += X @ self.coefs_
 
         if test_indices is not None:
             eta = eta[test_indices]
