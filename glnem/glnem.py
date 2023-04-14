@@ -286,6 +286,18 @@ class GLNEM(object):
     def model_kwargs_(self):
         return {'infer_dimension': self.infer_dimension,
                 'infer_sigma': self.infer_sigma, 'is_predictive': True}
+    
+    @property
+    def n_params_(self):
+        """
+        # of U params, Lambda Params, Intercept, and Coefficients.
+        """
+        n_covariates = self.coefs_.shape[0] if self.coefs_ else 0
+        return (
+                np.prod(self.U_.shape) +    # latent space
+                self.n_features +           # lambda 
+                n_covariates + 1    # covariate-effects + intercept
+        )
 
     def sample(self, Y, X=None, n_warmup=1000, n_samples=1000, adapt_delta=0.8,
                n_iter=10000, thinning=1, num_particles=1):
@@ -363,12 +375,22 @@ class GLNEM(object):
             for p, name in enumerate(self.feature_names_):
                 self.samples_[name] = coefs[:, p]
             self.coefs_ = coefs.mean(axis=0)
+        else:
+            self.coefs_ = None
 
         # save dispersion
         if self.family in ['gaussian', 'negbinom', 'zif_negbinom', 'tweedie', 'tobit']:
             self.dispersion_ = self.samples_['dispersion'].mean()
         else:
             self.dispersion_ = None
+
+        # tweedie var power
+        if self.family == 'tweedie':
+            self.var_power_ = (self.samples_['var_power'].mean() 
+                    if self.tweedie_var_power is None else 
+                    self.tweedie_var_power)
+        else:
+            self.var_power_ = None
 
         # fix permutation issue for each sample
         U_ref = self.samples_['U'][self.map_idx_]
@@ -417,7 +439,7 @@ class GLNEM(object):
 
         return self
 
-    def waic(self, Y=None, random_state=0):
+    def waic(self, Y=None, X=None, random_state=0):
         rng_key = random.PRNGKey(random_state)
         n_samples  = self.samples_['U'].shape[0]
         n_nodes = self.samples_['U'].shape[1]
@@ -425,10 +447,10 @@ class GLNEM(object):
         
         y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         train_indices = True if Y is not None else self.train_indices_
+        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
 
-        model_args = (y, self.X_dyad_, n_nodes, train_indices, self.n_features, self.v0, 
-                self.family, self.link,
-                self.tweedie_var_power)
+        model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
+                self.v0, self.family, self.link, self.tweedie_var_power)
         
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
@@ -439,7 +461,7 @@ class GLNEM(object):
         p_waic = loglik.var(axis=0).sum()
         return float(-2 * (lppd - p_waic))
 
-    def dic(self, Y=None, random_state=0):
+    def dic(self, Y=None, X=None, random_state=0):
         rng_key = random.PRNGKey(random_state)
         n_samples  = self.samples_['U'].shape[0]
         n_nodes = self.samples_['U'].shape[1]
@@ -447,31 +469,39 @@ class GLNEM(object):
 
         y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         train_indices = True if Y is not None else self.train_indices_
+        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
         
-        model_args = (y, self.X_dyad_, n_nodes, train_indices, self.n_features, self.v0, 
-                self.family, self.link, self.tweedie_var_power)
+        model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
+                self.v0, self.family, self.link, self.tweedie_var_power)
 
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
                 glnem, rng_key, samples,
-                *self.model_args_, **self.model_kwargs_))(*vmap_args)
+                *model_args, **self.model_kwargs_))(*vmap_args)
 
-        loglik_hat = self.loglikelihood(y)
+        loglik_hat = self.loglikelihood(y, X_dyad)
         p_dic = 2 * (loglik_hat - loglik.sum(axis=1).mean()).item()
 
-        return -2 * (loglik_hat - p_dic)
+        return -2 * loglik_hat + 2 * p_dic
 
-    def bic(self, Y):
-        n_nodes, _ = Y.shape
+    def bic(self, Y=None, X=None):
+        n_nodes = self.U_.shape[0]
         n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
-        loglik_hat = self.loglikelihood(adjacency_to_vec(Y))
-        p_bic = np.log(n_dyads) * (n_nodes + 1) * self.n_features
-        return -2 * loglik_hat + p_bic
+        
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
+        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
 
-    def aic(self, Y):
-        n_nodes, _ = Y.shape
-        loglik_hat = self.loglikelihood(adjacency_to_vec(Y))
-        return -2 * loglik_hat + (n_nodes + 1) * self.n_features
+        loglik_hat = self.loglikelihood(y, X_dyad)
+        return -2 * loglik_hat + np.log(n_dyads) * self.n_params_
+
+    def aic(self, Y=None, X=None):
+        n_nodes = self.U_.shape[0]
+        
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
+        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
+        
+        loglik_hat = self.loglikelihood(y, X_dyad)
+        return -2 * loglik_hat + 2 * self.n_params_ 
 
     def posterior_predictive(self, stat_fun, random_state=42):
         rng_key = random.PRNGKey(random_state)
@@ -484,12 +514,14 @@ class GLNEM(object):
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args))
 
-    def loglikelihood(self, y, test_indices=None):
+    def loglikelihood(self, y, X=None, test_indices=None):
         n_dyads = y.shape[0]
         n_nodes = self.U_.shape[0]
 
         subdiag = np.tril_indices(n_nodes, k=-1)
         eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[subdiag]
+        if X is not None:
+            eta += Z @ self.coefs_
 
         if test_indices is not None:
             eta = eta[test_indices]
@@ -498,7 +530,9 @@ class GLNEM(object):
             y_true = y
         
         mu = LINK_FUNCS[self.link](eta)
-        dis = get_distribution(mu, dispersion=self.dispersion_, family=self.family)
+        dis = get_distribution(mu, 
+                dispersion=self.dispersion_, var_power=self.var_power_,
+                family=self.family)
         loglik = dis.log_prob(y_true).sum()
 
         return np.asarray(loglik).item()
