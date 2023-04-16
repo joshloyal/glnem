@@ -134,7 +134,7 @@ def count_network(n_nodes=100, n_features=2, n_covariates=2, intercept=2.5, disp
 
 def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, intercept=1., 
                       family='bernoulli', link='logit', dispersion=None, 
-                      var_power=1.2, zif_proba=0.1, random_state=123):
+                      var_power=1.2, zif_prob=0.1, random_state=123):
     
     eta, X, params = generate_systematic_component(
             n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
@@ -144,7 +144,7 @@ def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, interce
     params['mu'] = mu
     dist = get_distribution(
             mu, dispersion=dispersion, var_power=var_power, family=family,
-            zif_proba=zif_proba)
+            zif_prob=zif_prob)
 
     rng_key = PRNGKey(random_state)
     y_vec = dist.sample(rng_key)
