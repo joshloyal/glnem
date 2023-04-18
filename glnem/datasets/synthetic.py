@@ -32,8 +32,6 @@ def mixture_latent_space(n_nodes, n_features=3, random_state=123):
     rng = check_random_state(random_state)
     
     c = np.ones(n_features) / np.sqrt(n_features)
-    #mu = np.array([[1, 0],
-    #               [-1, 0]])
     mu = np.vstack((c, -c))
     z = rng.choice([0, 1], size=n_nodes)
 

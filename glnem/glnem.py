@@ -153,7 +153,7 @@ def glnem(Y, Z, n_nodes, train_indices,
         sigmak = numpyro.sample("sigmak",
             dist.Exponential(rate=1/n_nodes).expand([n_features]))
     else:
-        sigmak = jnp.repeat(n_nodes ** 2, n_features)
+        sigmak = jnp.repeat(n_nodes, n_features)
 
     if infer_dimension:
         # Spike-and-Slab IBP
