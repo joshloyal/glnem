@@ -151,3 +151,41 @@ def plot_glnem(glnem, Y_obs=None, **fig_kwargs):
         ax['H'].set_xlabel('FPR')
 
     return ax
+
+
+def plot_covariate_posteriors(glnem, var_names=None, var_labels=None, figsize=None):
+    if var_names is None:
+        var_names = glnem.feature_names_
+    else:
+        var_names = [v for v in var_names if v in glnem.feature_names_]
+
+    if var_labels is None:
+        var_labels = var_names
+    
+    if len(var_names) == 0 or len(var_names) != len(var_labels):
+        raise ValueError
+
+    figsize = (4 * len(var_names), 2) if figsize is None else figsize 
+    fig, ax = plt.subplots(ncols=len(var_names), figsize=figsize)
+
+    for k, var in enumerate(var_names):
+        interval = list(np.quantile(glnem.samples_[var], q=[0.025, 0.975]))
+        mean = glnem.samples_[var].mean()
+
+        sns.kdeplot(glnem.samples_[var], c='k', ax=ax[k])
+        ax[k].plot([interval[0], interval[1]], [0, 0], lw=5, c='lightgray')
+
+        if k == 1:
+            ax[k].text(0.5, 0.8, f"[{interval[0]:.2f}, {interval[1]:.2f}]",  
+                    transform=ax[k].transAxes)
+        else:
+            ax[k].text(0.65, 0.8, f"[{interval[0]:.2f}, {interval[1]:.2f}]",  
+                    transform=ax[k].transAxes)
+
+        ax[k].axvline(0, c='k', linestyle='--', alpha=0.3)
+        ax[k].set_xlabel(var_labels[k], fontsize=12)
+        ax[k].set_ylabel('Density', fontsize=12)
+        if k > 0:
+            ax[k].set_ylabel('')
+
+    return ax

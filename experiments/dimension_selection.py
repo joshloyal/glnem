@@ -15,7 +15,7 @@ from glnem import GLNEM
 from glnem.glnem import find_permutation
 from glnem.datasets import synthetic_network
 from glnem.network_utils import adjacency_to_vec
-from glnem.model_selection import kfold
+from glnem.model_selection import kfold_selection, ic_selection
 
 
 set_host_device_count(10)
@@ -36,18 +36,37 @@ def compare_latent_space(U_pred, U_true):
     return corr, mse, perm
 
 
-def ic_selection(Y, X, n_features):
+#def ic_selection(Y, X, n_features):
+#
+#    # fit model
+#    model = GLNEM(
+#            family=family, link=link,
+#            infer_dimension=False, 
+#            infer_sigma=False,
+#            n_features=n_features)
+#
+#    model.sample(Y, X=X, n_warmup=2500, n_samples=2500)
+#
+#    return n_features, model.waic(), model.dic(), model.aic(), model.bic()
 
-    # fit model
-    model = GLNEM(
-            family=family, link=link,
-            infer_dimension=False, 
-            n_features=n_features)
-
-    model.sample(Y, X=X, n_warmup=2500, n_samples=2500)
-
-    return n_features, model.waic(), model.dic(), model.aic(), model.bic()
-
+#def kfold_selection(Y, X, n_features, n_folds=4, random_state=42):
+#    n_nodes = Y.shape[0]
+#    loglik = 0.
+#    folds = kfold(Y, n_splits=n_folds, random_state=random_state)
+#    for Y_train, test_indices in folds:
+#        # fit model
+#        model = GLNEM(
+#            family=family, link=link,
+#            infer_dimension=False,
+#            infer_sigma=False,
+#            n_features=n_features,
+#            random_state=123)
+#
+#        model.sample(Y_train, X=X, n_warmup=500, n_samples=500)
+#
+#        loglik += model.loglikelihood(test_indices=test_indices)
+#
+#    return n_features, loglik / n_folds
 
 
 Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
@@ -56,13 +75,16 @@ Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
 print(Y.mean())
 
 ## information criteria
-res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, X, d) for d in range(1, 9))
-data = pd.DataFrame(
-    np.asarray(res), columns=['n_features', 'waic', 'dic', 'aic', 'bic'])
+#res = Parallel(n_jobs=-1)(delayed(ic_selection)(Y, X, d) for d in range(1, 9))
+#data = pd.DataFrame(
+#    np.asarray(res), columns=['n_features', 'waic', 'dic', 'aic', 'bic'])
 
-## cross-validation
-#res = Parallel(n_jobs=-1)(delayed(kfold_selection)(Y, d) for d in range(1, 11))
-#data = pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik', 'auc'])
+# cross-validation
+#res = Parallel(n_jobs=-1)(delayed(kfold_selection)(Y, X, d) for d in range(1, 9))
+#data = pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik'])
+
+data = ic_selection(Y, X, family, link, max_features=8, n_warmup=2500, n_samples=2500)
+#data = kfold_selection(Y, X, family, link, max_features=8, n_warmup=2500, n_samples=2500)
 
 # Spike-and-Slab Variable Selection
 #model = GLNEM(family=family, link=link, n_features=8, random_state=82590)

@@ -300,7 +300,7 @@ class GLNEM(object):
         )
 
     def sample(self, Y, X=None, n_warmup=1000, n_samples=1000, adapt_delta=0.8,
-               n_iter=10000, thinning=1, num_particles=1):
+               thinning=1):
         numpyro.enable_x64()
 
         # network to dyad list
@@ -315,7 +315,7 @@ class GLNEM(object):
             self.feature_names_ = []
         else:
             if X.ndim != 2 or X.shape[0] != y.shape[0]:
-                raise ValueError()
+                raise ValueError("X has the wrong shape.")
             self.feature_names_ = [
                 'X{}'.format(p+1) for p in range(X.shape[-1])]
             self.X_dyad_ = jnp.asarray(X)
@@ -479,28 +479,22 @@ class GLNEM(object):
                 glnem, rng_key, samples,
                 *model_args, **self.model_kwargs_))(*vmap_args)
 
-        loglik_hat = self.loglikelihood(y, X_dyad)
+        loglik_hat = self.loglikelihood()
         p_dic = 2 * (loglik_hat - loglik.sum(axis=1).mean()).item()
 
         return -2 * loglik_hat + 2 * p_dic
 
-    def bic(self, Y=None, X=None):
+    def bic(self):
         n_nodes = self.U_.shape[0]
         n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
         
-        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
-        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
-
-        loglik_hat = self.loglikelihood(y, X_dyad)
+        loglik_hat = self.loglikelihood()
         return -2 * loglik_hat + np.log(n_dyads) * self.n_params_
 
-    def aic(self, Y=None, X=None):
+    def aic(self):
         n_nodes = self.U_.shape[0]
-        
-        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
-        X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
-        
-        loglik_hat = self.loglikelihood(y, X_dyad)
+         
+        loglik_hat = self.loglikelihood()
         return -2 * loglik_hat + 2 * self.n_params_ 
 
     def posterior_predictive(self, stat_fun, random_state=42):
@@ -514,7 +508,10 @@ class GLNEM(object):
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args))
 
-    def loglikelihood(self, y, X=None, test_indices=None):
+    def loglikelihood(self, Y=None, test_indices=None):
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
+        X = self.X_dyad_
+
         n_dyads = y.shape[0]
         n_nodes = self.U_.shape[0]
 
