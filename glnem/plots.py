@@ -127,28 +127,37 @@ def plot_glnem(glnem, Y_obs=None, **fig_kwargs):
             resid = quantile_residuals(y_vec, y_hat, dispersion=dispersion, var_power=var_power, family=glnem.family)
             ylab = 'Quantile Residual'
         else:
-            resid = y_vec - y_hat
-            ylab = 'Residual'
-
+            # "standardized residuals" using the estimated dispersion
+            if glnem.dispersion_ is not None:
+                resid = (y_vec - y_hat) / glnem.dispersion_
+            else:
+                resid = y_vec - y_hat 
+            ylab = 'Standardized Residual'
+        
+        # fitted vs. residual
         ax['F'].scatter(y_hat, resid, s=5)
         ax['F'].axhline(0, linestyle='--', c='k')
         ax['F'].set_ylabel(ylab)
         ax['F'].set_xlabel('Fitted')
-
-        # qq plot
+        
         qqplot(resid, line='45', markersize=2, ax=ax['G'])
 
-        # AUC curve for distinguishing zeros
-        probas = glnem.predict_zero_probas()
-        y_bin = y_vec == 0
+        # qq plot
+        if glnem.family in ['poisson', 'negbinom', 'tweedie', 'tobit']:
+            # AUC curve for distinguishing zeros
+            probas = glnem.predict_zero_probas()
+            y_bin = y_vec == 0
 
-        fpr, tpr, _ = roc_curve(y_bin, probas)
-        auc = roc_auc_score(y_bin, probas)
-        ax['H'].plot(fpr, tpr)
-        ax['H'].plot([0, 1], [0, 1], 'k--')
-        ax['H'].annotate(f'AUC = {auc:.3f}', (0.25, 0.0))
-        ax['H'].set_ylabel('TPR')
-        ax['H'].set_xlabel('FPR')
+            fpr, tpr, _ = roc_curve(y_bin, probas)
+            try:
+                auc = roc_auc_score(y_bin, probas)
+                ax['H'].plot(fpr, tpr)
+                ax['H'].plot([0, 1], [0, 1], 'k--')
+                ax['H'].annotate(f'AUC = {auc:.3f}', (0.25, 0.0))
+                ax['H'].set_ylabel('TPR')
+                ax['H'].set_xlabel('FPR')
+            except:
+                pass
 
     return ax
 

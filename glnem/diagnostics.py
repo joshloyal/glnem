@@ -50,7 +50,7 @@ def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_p
         dis = dist.ZeroInflatedPoisson(gate=zif_prob, rate=mu)
     elif family == 'negbinom':
         dis = dist.NegativeBinomial2(mean=mu, concentration=1/dispersion)
-    elif family == 'normal':
+    elif family == 'gaussian':
         dis = dist.Normal(mu, dispersion)
     else:
         raise ValueError()
