@@ -162,7 +162,7 @@ def plot_glnem(glnem, Y_obs=None, **fig_kwargs):
     return ax
 
 
-def plot_covariate_posteriors(glnem, var_names=None, var_labels=None, figsize=None):
+def plot_covariate_posteriors(glnem, var_names=None, var_labels=None, figsize=None, ax=None):
     if var_names is None:
         var_names = glnem.feature_names_
     else:
@@ -173,9 +173,10 @@ def plot_covariate_posteriors(glnem, var_names=None, var_labels=None, figsize=No
     
     if len(var_names) == 0 or len(var_names) != len(var_labels):
         raise ValueError
-
-    figsize = (4 * len(var_names), 2) if figsize is None else figsize 
-    fig, ax = plt.subplots(ncols=len(var_names), figsize=figsize)
+    
+    if ax is None:
+        figsize = (4 * len(var_names), 2) if figsize is None else figsize 
+        fig, ax = plt.subplots(ncols=len(var_names), figsize=figsize)
 
     for k, var in enumerate(var_names):
         interval = list(np.quantile(glnem.samples_[var], q=[0.025, 0.975]))

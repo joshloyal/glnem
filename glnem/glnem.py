@@ -144,12 +144,12 @@ LINK_FUNCS = {
 
 def glnem(Y, Z, n_nodes, train_indices,
           n_features=2, v0=0., family='bernoulli', link='identity',
-          tweedie_var_power=None, infer_dimension=False,
-          infer_sigma=True, is_predictive=False):
+          infer_dimension=False,
+          is_predictive=False):
 
     # sparsity factor
     eps = 0.1
-    if infer_sigma:
+    if infer_dimension:
         sigmak = numpyro.sample("sigmak",
             dist.Exponential(rate=1/n_nodes).expand([n_features]))
     else:
@@ -200,14 +200,13 @@ def glnem(Y, Z, n_nodes, train_indices,
     if family in ['zif_poisson', 'zif_negbinom']:
         q = numpyro.sample('q', dist.Uniform(low=0, high=1))
     
-    if family == 'tweedie' and tweedie_var_power is None:
+    if family == 'tweedie':
         # XXX: We restrict p to (1.01, 1.99) because the distribution becomes
         #      very multimodal as it converges to a discrete (p = 1, poisson) and 
         #      continous (p = 2, gamma) distribution.
         var_power = numpyro.sample("var_power", dist.Uniform(low=1.01, high=1.99))
     else:
-        p = 0.0 if tweedie_var_power is None else tweedie_var_power
-        var_power = numpyro.deterministic('var_power', p)
+        var_power = numpyro.deterministic('var_power', 0.0)
 
     # bilinear predictor
     subdiag = jnp.tril_indices(n_nodes, k=-1)
@@ -262,30 +261,25 @@ class GLNEM(object):
                  family='bernoulli',
                  link='logit',
                  infer_dimension=True,
-                 infer_sigma=True,
-                 tweedie_var_power=None,
                  v0=0.,
                  random_state=42):
         self.n_features = n_features
         self.infer_dimension = infer_dimension
-        self.infer_sigma = infer_sigma
         self.v0 = v0
         self.family = family
         self.link = link
-        self.tweedie_var_power = tweedie_var_power
         self.random_state = random_state
     
     @property
     def model_args_(self):
         n_nodes = self.samples_['U'].shape[1]
         return (None, self.X_dyad_, n_nodes, True, self.n_features, self.v0, 
-                self.family, self.link,
-                self.tweedie_var_power)
+                self.family, self.link)
 
     @property
     def model_kwargs_(self):
         return {'infer_dimension': self.infer_dimension,
-                'infer_sigma': self.infer_sigma, 'is_predictive': True}
+                'is_predictive': True}
     
     @property
     def n_params_(self):
@@ -324,10 +318,9 @@ class GLNEM(object):
         rng_key = random.PRNGKey(self.random_state)
         model_args = (
             y, self.X_dyad_, n_nodes, train_indices, self.n_features, self.v0, 
-            self.family, self.link, self.tweedie_var_power)
+            self.family, self.link)
         model_kwargs = {
             'infer_dimension': self.infer_dimension,
-            'infer_sigma': self.infer_sigma,
             'is_predictive': False}
 
         if self.infer_dimension:
@@ -386,9 +379,7 @@ class GLNEM(object):
 
         # tweedie var power
         if self.family == 'tweedie':
-            self.var_power_ = (self.samples_['var_power'].mean() 
-                    if self.tweedie_var_power is None else 
-                    self.tweedie_var_power)
+            self.var_power_ = self.samples_['var_power'].mean() 
         else:
             self.var_power_ = None
 
@@ -450,7 +441,7 @@ class GLNEM(object):
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
 
         model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
-                self.v0, self.family, self.link, self.tweedie_var_power)
+                self.v0, self.family, self.link)
         
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
@@ -472,7 +463,7 @@ class GLNEM(object):
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
         
         model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
-                self.v0, self.family, self.link, self.tweedie_var_power)
+                self.v0, self.family, self.link)
 
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
@@ -497,17 +488,21 @@ class GLNEM(object):
         loglik_hat = self.loglikelihood()
         return -2 * loglik_hat + 2 * self.n_params_ 
 
-    def posterior_predictive(self, stat_fun, random_state=42):
+    def posterior_predictive(self, stat_fun=None, random_state=42):
         rng_key = random.PRNGKey(random_state)
         n_samples  = self.samples_['U'].shape[0]
         vmap_args = (self.samples_, random.split(rng_key, n_samples))
+        
+        if stat_fun is None:
+            # posterior predictive draws of the network itself
+            stat_fun = lambda x: x
 
         return np.asarray(vmap(
             lambda samples, rng_key : posterior_predictive(
                 glnem, rng_key, samples, stat_fun,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args))
-
+    
     def loglikelihood(self, Y=None, test_indices=None):
         y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         X = self.X_dyad_

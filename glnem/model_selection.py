@@ -40,22 +40,21 @@ def kfold(Y, n_splits=4, random_state=None):
 def kfold_selection_single(Y, X, family, link, n_features, 
         n_warmup=500, n_samples=500, n_folds=4, random_state=42):
     n_nodes = Y.shape[0]
-    loglik = 0.
+    logliks = np.zeros(n_folds)
     folds = kfold(Y, n_splits=n_folds, random_state=random_state)
-    for Y_train, test_indices in folds:
+    for k, (Y_train, test_indices) in enumerate(folds):
         # fit model
         model = GLNEM(
             family=family, link=link,
             infer_dimension=False,
-            infer_sigma=False,
             n_features=n_features,
-            random_state=123)
+            random_state=42)
 
         model.sample(Y_train, X=X, n_warmup=n_warmup, n_samples=n_samples)
 
-        loglik += model.loglikelihood(Y, test_indices=test_indices)
+        logliks[k] = model.loglikelihood(Y, test_indices=test_indices)
 
-    return n_features, loglik / n_folds
+    return n_features, np.mean(logliks), np.std(logliks)
 
 
 def kfold_selection(Y, X=None, family='bernoulli', link='logit',
@@ -68,7 +67,7 @@ def kfold_selection(Y, X=None, family='bernoulli', link='logit',
         n_folds=n_folds, random_state=random_state) for 
             d in range(min_features, max_features + 1))
 
-    return pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik'])
+    return pd.DataFrame(np.asarray(res), columns=['n_features', 'loglik', 'se'])
 
 
 def ic_selection_single(Y, X, family, link, n_features, 
