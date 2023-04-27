@@ -3,7 +3,7 @@ import pandas as pd
 
 from math import ceil
 from sklearn.base import clone
-from sklearn.model_selection import KFold
+from sklearn.model_selection import KFold, ShuffleSplit
 from sklearn.utils import check_random_state
 from joblib import Parallel, delayed
 
@@ -12,6 +12,18 @@ from .network_utils import adjacency_to_vec
 
 
 MAX_INT = np.iinfo(np.int32).max
+
+
+def train_test_split(Y, test_size=0.2, random_state=None):
+    n_nodes, _ = Y.shape
+    y = adjacency_to_vec(Y)
+
+    tril_indices = np.tril_indices(n_nodes, k=-1)
+    rs = ShuffleSplit(
+            n_splits=1, test_size=test_size, random_state=random_state)
+    _, test = next(rs.split(y))
+ 
+    return test
 
 
 def kfold(Y, n_splits=4, random_state=None):
@@ -28,13 +40,14 @@ def kfold(Y, n_splits=4, random_state=None):
     tril_indices = np.tril_indices(n_nodes, k=-1)
     kfolds = KFold(n_splits=n_splits, random_state=random_state, shuffle=True)
     for train, test in kfolds.split(y):
-        Y_train = np.zeros_like(Y)
-        y_vec = np.copy(y)
-        y_vec[test] = -1.0
-        Y_train[tril_indices] = y_vec
-        Y_train += Y_train.T
+        #Y_train = np.zeros_like(Y)
+        #y_vec = np.copy(y)
+        #y_vec[test] = -1.0
+        #Y_train[tril_indices] = y_vec
+        #Y_train += Y_train.T
         
-        yield Y_train, test
+        #yield Y_train, test
+        yield test
 
 
 def kfold_selection_single(Y, X, family, link, n_features, 
@@ -42,7 +55,8 @@ def kfold_selection_single(Y, X, family, link, n_features,
     n_nodes = Y.shape[0]
     logliks = np.zeros(n_folds)
     folds = kfold(Y, n_splits=n_folds, random_state=random_state)
-    for k, (Y_train, test_indices) in enumerate(folds):
+    #for k, (Y_train, test_indices) in enumerate(folds):
+    for k, test_indices in enumerate(folds):
         # fit model
         model = GLNEM(
             family=family, link=link,
@@ -50,7 +64,10 @@ def kfold_selection_single(Y, X, family, link, n_features,
             n_features=n_features,
             random_state=42)
 
-        model.sample(Y_train, X=X, n_warmup=n_warmup, n_samples=n_samples)
+        #model.sample(Y_train, X=X, n_warmup=n_warmup, n_samples=n_samples)
+        
+        model.sample(Y, X=X, n_warmup=n_warmup, n_samples=n_samples,
+            missing_edges=test_indices)
 
         logliks[k] = model.loglikelihood(Y, test_indices=test_indices)
 
@@ -77,7 +94,6 @@ def ic_selection_single(Y, X, family, link, n_features,
     model = GLNEM(
             family=family, link=link,
             infer_dimension=False, 
-            infer_sigma=False,
             n_features=n_features,
             random_state=123)
 

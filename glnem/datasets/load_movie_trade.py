@@ -7,7 +7,7 @@ from os.path import dirname, join
 from glnem.network_utils import adjacency_to_vec
 
 
-__all__ = ['load_movie_trade']
+__all__ = ['load_trade']
     
 
 def weights_to_covariates(g, weights, ids=None):
@@ -64,18 +64,25 @@ def load_data(product):
 #    return Y, np.log1p(X)
 
 
-def load_movie_trade():
+def load_trade(trade_type='movies', max_nodes=None):
     module_path = dirname(__file__)
-    file_path = join(module_path, 'raw_data', 'BACI_HS17_V202301', 'movies.npy')
+    file_path = join(module_path, 'raw_data', 'BACI_HS17_V202301', f'{trade_type}.npy')
     A = joblib.load(file_path)
     
     Y = A[0]
+
+    if max_nodes is not None:
+        node_ids = np.argsort(Y.sum(axis=1))[::-1][:max_nodes]
+        Y = Y[node_ids][:, node_ids]
 
     n_nodes = Y.shape[0]
     n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
     n_features = A.shape[0] - 1
     X = np.zeros((n_dyads, n_features))
     for p in range(n_features):
-        X[:, p] = adjacency_to_vec(A[p+1])
+        Ap = A[p+1]
+        if max_nodes is not None:
+            Ap = Ap[node_ids][:, node_ids]
+        X[:, p] = adjacency_to_vec(Ap)
 
     return Y, X

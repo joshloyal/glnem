@@ -293,16 +293,23 @@ class GLNEM(object):
                 n_covariates + 1    # covariate-effects + intercept
         )
 
-    def sample(self, Y, X=None, n_warmup=1000, n_samples=1000, adapt_delta=0.8,
+    def sample(self, Y, X=None, n_warmup=1000, n_samples=1000, 
+               missing_edges=None, adapt_delta=0.8,
                thinning=1):
         numpyro.enable_x64()
 
         # network to dyad list
         n_nodes = Y.shape[0]
         y = adjacency_to_vec(Y)
-        train_indices = y != -1
         self.y_fit_ = y
-        self.train_indices_ = train_indices
+        #train_indices = y != -1
+        #self.train_indices_ = train_indices
+
+        if missing_edges is not None:
+            self.train_indices_ = np.repeat(True, y.shape[0])
+            self.train_indices_[missing_edges] = False
+        else:
+            self.train_indices_ = True
         
         if X is None:
             self.X_dyad_ = None
@@ -317,8 +324,8 @@ class GLNEM(object):
         # run mcmc sampler
         rng_key = random.PRNGKey(self.random_state)
         model_args = (
-            y, self.X_dyad_, n_nodes, train_indices, self.n_features, self.v0, 
-            self.family, self.link)
+            y, self.X_dyad_, n_nodes, self.train_indices_, self.n_features, 
+            self.v0, self.family, self.link)
         model_kwargs = {
             'infer_dimension': self.infer_dimension,
             'is_predictive': False}
