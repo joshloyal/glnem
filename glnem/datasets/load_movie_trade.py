@@ -66,14 +66,16 @@ def load_data(product):
 
 def load_trade(trade_type='movies', max_nodes=None):
     module_path = dirname(__file__)
-    file_path = join(module_path, 'raw_data', 'BACI_HS17_V202301', f'{trade_type}.npy')
-    A = joblib.load(file_path)
-    
+    base_path = join(module_path, 'raw_data', 'BACI_HS17_V202301')
+    A = joblib.load(join(base_path, f'{trade_type}.npy'))
+    countries = pd.read_csv(
+             join(base_path, f'countries_{trade_type}.csv')).values
     Y = A[0]
 
     if max_nodes is not None:
         node_ids = np.argsort(Y.sum(axis=1))[::-1][:max_nodes]
         Y = Y[node_ids][:, node_ids]
+        countries = countries[node_ids]
 
     n_nodes = Y.shape[0]
     n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
@@ -85,4 +87,4 @@ def load_trade(trade_type='movies', max_nodes=None):
             Ap = Ap[node_ids][:, node_ids]
         X[:, p] = adjacency_to_vec(Ap)
 
-    return Y, X
+    return Y, X, countries
