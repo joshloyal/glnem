@@ -52,7 +52,7 @@ def generate_systematic_component(
     if family in ['poisson', 'negbinom']:
         lmbda = 0.5 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
     elif family in ['tweedie']:
-        lmbda = 1.5 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
+        lmbda = 2 * z  + np.sqrt(n_nodes) * rng.randn(U.shape[1])
     else:
         lmbda = z + np.sqrt(n_nodes) * rng.randn(U.shape[1])
     
