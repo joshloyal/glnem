@@ -79,9 +79,10 @@ def tweedie_logp(y, mu, p, tau):
             -(mu ** (2 - p) / (tau * (2 - p))),
         )
 
-def tweedie_logp_series(y, mu, p, tau):
+def tweedie_logp_series(y, mu, p, tau, max_j=25.):
     #j_range = lax.stop_gradient(get_jrange(y, p, tau))
-    j_range = jnp.arange(1., 100.)[:, jnp.newaxis]
+    #j_range = jnp.arange(1., 100.)[:, jnp.newaxis]
+    j_range = jnp.arange(1., max_j)[:, jnp.newaxis]
     log_w = logsumexp(log_wj(y, p, tau, j_range), axis=0)
     
     theta = (mu ** (1 - p)) / (1 - p)
