@@ -23,7 +23,8 @@ from sklearn.utils import check_random_state
 
 from .tweedie import Tweedie, Chi2ZeroDoF
 from .tobit import Tobit
-from .mcmc_utils import Phi, polar_decomposition, centered_qr_decomposition
+from .mcmc_utils import (Phi, polar_decomposition, centered_qr_decomposition, 
+        centered_projected_normal)
 from .mcmc_utils import condition
 from .network_utils import adjacency_to_vec
 from .plots import plot_glnem
@@ -148,7 +149,7 @@ def glnem(Y, Z, n_nodes, train_indices,
           is_predictive=False):
 
     # sparsity factor
-    eps = 0.1
+    eps = 1e-3 * n_nodes
     if infer_dimension:
         sigmak = numpyro.sample("sigmak",
             dist.Exponential(rate=1/n_nodes).expand([n_features]))
@@ -158,7 +159,7 @@ def glnem(Y, Z, n_nodes, train_indices,
     if infer_dimension:
         # Spike-and-Slab IBP
         v1 = numpyro.sample("v1", dist.Beta(
-            (1/n_features), 1 + n_features ** (1 + eps)))
+            (1/n_features), 1 + n_features ** (1. + eps)))
         vh = numpyro.sample("vh", dist.Beta(
             (1/n_features) * jnp.ones(n_features-1), jnp.ones(n_features - 1)))
         v = numpyro.deterministic("v", jnp.concatenate((jnp.array([v1]), vh)))
@@ -584,5 +585,5 @@ class GLNEM(object):
         print_summary(self,
                 self.samples_, self.feature_names_, self.diverging_, prob=proba)
 
-    def plot(self, Y_obs=None, **fig_kwargs):
-        return plot_glnem(self, Y_obs, **fig_kwargs)
+    def plot(self, Y_obs=None, include_diagnostics=True, **fig_kwargs):
+        return plot_glnem(self, Y_obs, include_diagnostics, **fig_kwargs)

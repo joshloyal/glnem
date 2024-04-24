@@ -52,6 +52,10 @@ def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_p
         dis = dist.NegativeBinomial2(mean=mu, concentration=1/dispersion)
     elif family == 'gaussian':
         dis = dist.Normal(mu, dispersion)
+    elif family == 't':
+        dis = dist.StudentT(5, mu, dispersion)
+    elif family == 'laplace':
+        dis = dist.Laplace(mu, dispersion)
     else:
         raise ValueError()
     

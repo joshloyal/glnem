@@ -7,6 +7,7 @@ from jax import jit, random
 from jax.scipy.special import expit
 from scipy.linalg import orthogonal_procrustes
 from numpyro.primitives import Messenger
+from numpyro.distributions.util import safe_normalize
 
 
 @jit
@@ -24,6 +25,10 @@ def centered_qr_decomposition(X):
     Q *= S
     return Q[:, 1:]
 
+@jit
+def centered_projected_normal(X):
+    U = X - np.mean(X, axis=0)
+    return safe_normalize(U.T).T
 
 @jit
 def ordered_expit(predictor, cutpoints):
