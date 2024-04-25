@@ -27,25 +27,41 @@ def centered_stiefel(n, p, random_state=None):
     X = rng.randn(n, p)
     return centered_qr_decomposition(X)
 
+def pairwise_distance(U):
+    U_norm_sq = jnp.sum(U ** 2, axis=1).reshape(-1, 1)
+    dist_sq = U_norm_sq + U_norm_sq.T - 2 * U @ U.T
+    return dist_sq
 
-def mixture_latent_space(n_nodes, n_features=3, random_state=123):
+
+def mixture_latent_space(n_nodes, n_features=3, sigma=0.1, random_state=123):
     rng = check_random_state(random_state)
     
     c = np.ones(n_features) / np.sqrt(n_features)
     mu = np.vstack((c, -c))
     z = rng.choice([0, 1], size=n_nodes)
 
-    X = mu[z] + 0.1 * rng.randn(n_nodes, n_features)
+    X = mu[z] + sigma * rng.randn(n_nodes, n_features) 
 
     return centered_qr_decomposition(X), z
 
+
+def mixture_latent_space_lpm(n_nodes, random_state=123):
+    rng = check_random_state(random_state)
+    
+    c = rng.choice([0, 1, 2], size=n_nodes)
+    mu = np.array([[-1.5, 0],
+                   [1.5, 0],
+                   [0, 1.5]]) 
+    X = mu[c] + np.sqrt(0.1) * rng.randn(n_nodes, 2)
+    
+    return X, c
 
 def generate_systematic_component(
         n_nodes=100, n_features=3, n_covariates=2, intercept=1.,
         family='bernoulli', random_state=123):
     rng = check_random_state(random_state)
      
-    U, c = mixture_latent_space(n_nodes, n_features, rng)
+    U, c = mixture_latent_space(n_nodes, n_features, random_state=rng)
     
     # eigenvalues
     z = rng.choice([-n_nodes, n_nodes], size=U.shape[1])
@@ -80,6 +96,41 @@ def generate_systematic_component(
             'coefs': coefs,
             'z': c,
             'similarities': ULUt, 
+            'linear_predictor': eta
+    }
+    
+    return eta, X, params
+
+
+def generate_systematic_component_lpm(
+        n_nodes=100, n_features=3, n_covariates=2, intercept=1.,
+        family='bernoulli', random_state=123):
+    rng = check_random_state(random_state)
+     
+    U, c = mixture_latent_space_lpm(n_nodes, random_state=rng) 
+
+    # covariates
+    if n_covariates is not None and n_covariates > 1:
+        n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
+        coefs = np.zeros(n_covariates)
+        coefs[:2] = np.array([-0.5, 0.5])
+        X = rng.uniform(-1, 1, size=(n_dyads, n_covariates))
+    else:
+        X = None
+        coefs = None
+    
+    subdiag = np.tril_indices(n_nodes, k=-1)
+    dist = pairwise_distance(U)
+    eta = intercept - np.sqrt(dist[subdiag])
+    if X is not None:
+        eta += X @ coefs
+    
+    params = {
+            'intercept': intercept,
+            'U': U,
+            'coefs': coefs,
+            'z': c,
+            'similarities': dist, 
             'linear_predictor': eta
     }
     
@@ -134,9 +185,30 @@ def count_network(n_nodes=100, n_features=2, n_covariates=2, intercept=2.5, disp
 
 def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, intercept=1., 
                       family='bernoulli', link='logit', dispersion=None, 
-                      var_power=1.2, zif_prob=0.1, random_state=123):
+                      var_power=1.2, zif_prob=0.1, df=5, random_state=123):
     
     eta, X, params = generate_systematic_component(
+            n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
+            intercept=intercept, family=family, random_state=random_state)
+
+    mu = LINK_FUNCS[link](eta)
+    params['mu'] = mu
+    dist = get_distribution(
+            mu, dispersion=dispersion, var_power=var_power, family=family,
+            zif_prob=zif_prob, df=df)
+
+    rng_key = PRNGKey(random_state)
+    y_vec = dist.sample(rng_key)
+
+    return vec_to_adjacency(y_vec), X, params
+
+
+def synthetic_lpm_network(
+        n_nodes=100, n_features='mixture', n_covariates=2, intercept=1., 
+        family='bernoulli', link='logit', dispersion=None, 
+        var_power=1.2, zif_prob=0.1, random_state=123):
+    
+    eta, X, params = generate_systematic_component_lpm(
             n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
             intercept=intercept, family=family, random_state=random_state)
 

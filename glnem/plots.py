@@ -249,3 +249,122 @@ def plot_covariate_posteriors(glnem, var_names=None, var_labels=None, figsize=No
             ax[k].set_ylabel('')
 
     return ax
+
+
+def plot_lpm(lpm, Y_obs=None, include_diagnostics=True, **fig_kwargs):
+    if include_diagnostics:
+        ax = plt.figure(
+            constrained_layout=True, **fig_kwargs).subplot_mosaic(
+            """
+            ABC
+            GHI
+            """
+        )
+    else:
+        ax = plt.figure(
+            constrained_layout=True, **fig_kwargs).subplot_mosaic(
+            """
+            ABC
+            """
+        )
+
+    # plot lambda values
+    n_samples, n_nodes, n_features = lpm.samples_['U'].shape
+    ax['A'].plot(np.asarray(lpm.logp_), alpha=0.8)
+    ax['A'].set_ylabel(r'Log-Posterior')
+    ax['A'].set_xlabel(r'Iteration')
+
+    # plot intercept
+    ax['B'].plot(np.asarray(lpm.samples_['intercept']), alpha=0.8)
+    ax['B'].axhline(lpm.intercept_, color='k', linestyle='--', lw=2)
+    ax['B'].set_ylabel(r'Intercept')
+    ax['B'].set_xlabel(r'Iteration')
+    
+    if lpm.X_dyad_ is not None: 
+        for p, name in enumerate(lpm.feature_names_):
+            coef_samples = lpm.samples_[name] 
+            ax['C'].plot(coef_samples, alpha=0.8)
+            ax['C'].axhline(coef_samples.mean(), color='k', linestyle='--')
+            ax['C'].text(x=n_samples, y=coef_samples.mean(), s=r"$\beta_{}$".format(p+1)) 
+        ax['C'].set_ylabel(r'Covariate Effects')
+        ax['C'].set_xlabel(r'Iteration')
+
+    # goodness-of-fit statistics
+    y_vec = adjacency_to_vec(Y_obs)
+    
+    if not include_diagnostics:
+        return ax
+
+    if lpm.family == 'bernoulli':
+        stats = {
+            'density': density,
+            'transitivity': transitivity
+        }
+        names = ['G', 'H']
+        for k, (key, stat_func) in zip(names, stats.items()):
+            res = lpm.posterior_predictive(stat_func)
+            sns.histplot(res, edgecolor='k', color='#add8e6', ax=ax[k])
+            ax[k].axvline(
+                stat_func(y_vec), color='k', linestyle='--', linewidth=3)
+            ax[k].set_xlabel(key)
+
+        # degree distribution
+        degrees = lpm.posterior_predictive(degree)
+        max_degree = np.max(degrees) + 1
+        deg_dist = degree_distribution(degrees)
+        sns.boxplot(x='degree', y='count', data=deg_dist, color='w', fliersize=0,
+                    ax=ax['I'], **BOXPLOT_PROPS)
+        ax['I'].plot(
+            np.bincount(degree(y_vec).ravel(), minlength=max_degree + 1),
+            'k-', linewidth=3)
+
+        # 95% credible intervals
+        bounds = deg_dist.groupby('degree').quantile([0.025, 0.975])
+        ax['I'].plot(bounds.xs(0.025, level=1).values.ravel(), ':', c='gray')
+        ax['I'].plot(bounds.xs(0.975, level=1).values.ravel(), ':', c='gray')
+        ax['I'].set_ylabel('Number of Nodes')
+        ax['I'].set_xlabel('Degree')
+    else:
+        # diagnostic plots 
+        y_hat = lpm.predict()
+        
+        if lpm.family in ['poisson', 'negbinom', 'tweedie', 'tobit']:
+            # fitted vs. quantile residual plot for distributions with discrete components
+            dispersion = lpm.samples_['dispersion'].mean() if lpm.family in ['negbinom', 'tweedie', 'tobit'] else 0
+            var_power = lpm.samples_['var_power'].mean() if lpm.family == 'tweedie' else None
+            resid = quantile_residuals(y_vec, y_hat, dispersion=dispersion, var_power=var_power, family=lpm.family)
+            ylab = 'Quantile Residual'
+        else:
+            # "standardized residuals" using the estimated dispersion
+            if lpm.dispersion_ is not None:
+                resid = (y_vec - y_hat) / lpm.dispersion_
+            else:
+                resid = y_vec - y_hat 
+            ylab = 'Standardized Residual'
+        
+        # fitted vs. residual
+        ax['G'].scatter(y_hat, resid, s=5)
+        ax['G'].axhline(0, linestyle='--', c='k')
+        ax['G'].set_ylabel(ylab)
+        ax['G'].set_xlabel('Fitted')
+        
+        qqplot(resid, line='45', markersize=2, ax=ax['H'])
+
+        # qq plot
+        if lpm.family in ['poisson', 'negbinom', 'tweedie', 'tobit']:
+            # AUC curve for distinguishing zeros
+            probas = lpm.predict_zero_probas()
+            y_bin = y_vec == 0
+
+            fpr, tpr, _ = roc_curve(y_bin, probas)
+            try:
+                auc = roc_auc_score(y_bin, probas)
+                ax['I'].plot(fpr, tpr)
+                ax['I'].plot([0, 1], [0, 1], 'k--')
+                ax['I'].annotate(f'AUC = {auc:.3f}', (0.25, 0.0))
+                ax['I'].set_ylabel('TPR')
+                ax['I'].set_xlabel('FPR')
+            except:
+                pass
+
+    return ax
