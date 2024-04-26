@@ -146,7 +146,7 @@ LINK_FUNCS = {
 
 
 def lpm(Y, Z, n_nodes, train_indices,
-        n_features=2, family='bernoulli', link='identity',
+        n_features=2, family='bernoulli', link='identity', ls_type='distance',
         is_predictive=False):
 
     sigma = numpyro.sample('sigma', dist.InverseGamma(1.5, 1.5)) # 1 * invX2(1)
@@ -186,8 +186,14 @@ def lpm(Y, Z, n_nodes, train_indices,
 
     # euclidean distance predictor
     subdiag = jnp.tril_indices(n_nodes, k=-1)
-    dis = pairwise_distance(U)
-    eta = intercept - jnp.sqrt(dis[subdiag])
+    if ls_type == 'distance':
+        dis = pairwise_distance(U)
+        eta = intercept - jnp.sqrt(dis[subdiag])
+    elif ls_type == 'distance_sq':
+        dis = pairwise_distance(U)
+        eta = intercept - dis[subdiag] 
+    else:
+        eta = intercept + (U @ U.T)[subdiag]
 
     if Z is not None:
         eta += Z @ coefs
@@ -235,17 +241,19 @@ class LatentPositionModel(object):
                  n_features=2,
                  family='bernoulli',
                  link='logit',
+                 ls_type='distance',
                  random_state=42):
         self.n_features = n_features
         self.family = family
         self.link = link
+        self.ls_type = ls_type
         self.random_state = random_state
     
     @property
     def model_args_(self):
         n_nodes = self.samples_['U'].shape[1]
         return (None, self.X_dyad_, n_nodes, True, self.n_features,  
-                self.family, self.link)
+                self.family, self.link, self.ls_type)
 
     @property
     def model_kwargs_(self):
@@ -294,7 +302,7 @@ class LatentPositionModel(object):
         rng_key = random.PRNGKey(self.random_state)
         model_args = (
             y, self.X_dyad_, n_nodes, self.train_indices_, self.n_features, 
-            self.family, self.link)
+            self.family, self.link, self.ls_type)
         model_kwargs = {'is_predictive': False}
         init_values = init_to_uniform()
 

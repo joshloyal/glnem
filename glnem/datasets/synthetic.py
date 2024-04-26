@@ -56,6 +56,7 @@ def mixture_latent_space_lpm(n_nodes, random_state=123):
     
     return X, c
 
+
 def generate_systematic_component(
         n_nodes=100, n_features=3, n_covariates=2, intercept=1.,
         family='bernoulli', random_state=123):
@@ -104,7 +105,7 @@ def generate_systematic_component(
 
 def generate_systematic_component_lpm(
         n_nodes=100, n_features=3, n_covariates=2, intercept=1.,
-        family='bernoulli', random_state=123):
+        family='bernoulli', ls_type='distance', random_state=123):
     rng = check_random_state(random_state)
      
     U, c = mixture_latent_space_lpm(n_nodes, random_state=rng) 
@@ -120,8 +121,17 @@ def generate_systematic_component_lpm(
         coefs = None
     
     subdiag = np.tril_indices(n_nodes, k=-1)
-    dist = pairwise_distance(U)
-    eta = intercept - np.sqrt(dist[subdiag])
+
+    if ls_type == 'distance':
+        dist = np.sqrt(pairwise_distance(U)[subdiag])
+        eta = intercept - dist
+    elif ls_type == 'distance_sq':
+        dist = pairwise_distance(U)[subdiag]
+        eta = intercept - dist
+    else:
+        dist = (U @ U.T)[subdiag]
+        eta = intercept + dist
+
     if X is not None:
         eta += X @ coefs
     
@@ -205,12 +215,13 @@ def synthetic_network(n_nodes=100, n_features='mixture', n_covariates=2, interce
 
 def synthetic_lpm_network(
         n_nodes=100, n_features='mixture', n_covariates=2, intercept=1., 
-        family='bernoulli', link='logit', dispersion=None, 
+        family='bernoulli', link='logit', ls_type='distance', dispersion=None, 
         var_power=1.2, zif_prob=0.1, random_state=123):
     
     eta, X, params = generate_systematic_component_lpm(
             n_nodes=n_nodes, n_features=n_features, n_covariates=n_covariates, 
-            intercept=intercept, family=family, random_state=random_state)
+            intercept=intercept, family=family, ls_type=ls_type, 
+            random_state=random_state)
 
     mu = LINK_FUNCS[link](eta)
     params['mu'] = mu
