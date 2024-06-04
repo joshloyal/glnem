@@ -434,7 +434,7 @@ class GLNEM(object):
         self.lambda_ = self.samples_['lambda'].mean(axis=0)
         self.intercept_ = self.samples_['intercept'].mean(axis=0)
         self.U_mean_ = self.samples_['U'].mean(axis=0)
-        self.U_ = polar_decomposition(self.U_mean_)
+        self.U_ = np.asarray(polar_decomposition(self.U_mean_))
 
         return self
 

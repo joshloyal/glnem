@@ -54,6 +54,9 @@ def mixture_latent_space_lpm(n_nodes, random_state=123):
                    [0, 1.5]]) 
     X = mu[c] + np.sqrt(0.1) * rng.randn(n_nodes, 2)
     
+    # center latent space
+    X -= X.mean(axis=0)
+
     return X, c
 
 
