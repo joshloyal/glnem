@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/joshloyal/glnem/blob/main/LICENSE)
 
-## A Spike-and-Slab Prior for Generalized Linear Network Eigenmodels (GLNEMs) 
+## A Spike-and-Slab Prior for Generalized Linear Network Eigenmodels
 
 *Author: [Joshua D. Loyal](https://joshloyal.github.io/)*
 
