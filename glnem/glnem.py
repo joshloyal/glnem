@@ -581,7 +581,7 @@ class GLNEM(object):
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
 
-    def print_summary(self, proba=0.9):
+    def print_summary(self, proba=0.95):
         print_summary(self,
                 self.samples_, self.feature_names_, self.diverging_, prob=proba)
 

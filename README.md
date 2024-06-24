@@ -36,89 +36,69 @@ Example
 
 ```python
 import matplotlib.pyplot as plt
-import numpy as np
 
-from splinetlsm import SplineDynamicLSM
-from splinetlsm.datasets import load_polecat
+from glnem import GLNEM
+from glnem.datasets import load_trees
 
 
-# small version of polecat
-Y, time_points, X, node_names, iso_codes, regions, time_labels = load_polecat(
-        n_nodes=50)
+# load tree network example
+Y, X = load_trees()
 
+# weighted adjacency matrix
 Y.shape
-#>>> (259, 50, 50)
-time_points.shape
-#>>> (259,)
+#>>> (51, 51)
+
+# dyadic covariates, shape (n_dyads, n_covariates)
 X.shape
-#>>> (259, 50, 50, 4)
+#>>> (1275, 3)
 
-# initialize a model with d = 6 latent space dimensions
-model = SplineDynamicLSM(n_features=6, alpha=0.95)
+# initialize negative binomial GLNEM with a log-link and d = 10 latent features
+glnem = GLNEM(family='negbinom', link='log', n_features=10)
 
-# fit the model using SVI with a maximum of 50 iterations
-model.fit(Y, time_points, X, max_iter=50)
+# run the MCMC algorithm for 2,500 warm-up iterations and collect 2,500 post warm-up samples
+glnem.sample(Y, X, n_warmup=2500, n_samples=2500)
 
-# samples from the variational posterior are stored in model.samples_
-# plot coefficient function
-coefs = model.samples_['W_coefs'] @ model.B_fit_.todense()
-coefs = coefs.transpose((0, 2, 1))
-ci = np.quantile(coefs, q=[0.025, 0.5, 0.975], axis=0)
+# summary of the posterior distribution
+glnem.print_summary()
+#>>> sample: 100%|████████████████████████████████████████████████████████████████████████████████| 500/500 [00:29<00:00, 17.06it/s, 63 steps of size 8.06e-02. acc. prob=0.93]
+#>>> sample: 100%|██████████████████████████████████████████████████████████████████████████████| 5000/5000 [02:01<00:00, 41.19it/s, 63 steps of size 9.46e-02. acc. prob=0.91]
+#>>> WAIC: 3808.051
+#>>> 
+#>>>                   mean       std    median      2.5%     97.5%     n_eff     r_hat
+#>>>           X1     -0.49      0.02     -0.49     -0.54     -0.44   5384.40      1.00
+#>>>           X2     -1.81      0.18     -1.81     -2.14     -1.46   4928.38      1.00
+#>>>           X3      0.04      0.04      0.04     -0.03      0.12   5778.22      1.00
+#>>>   dispersion      0.53      0.06      0.53      0.42      0.64   5725.31      1.00
+#>>>    intercept      3.21      0.25      3.20      2.71      3.70   4524.41      1.00
+#>>>    lambda[0]     30.67      2.41     30.70     25.74     35.09   2382.81      1.00
+#>>>    lambda[1]     -0.00      0.15      0.00      0.00     -0.00   2500.45      1.00
+#>>>    lambda[2]      0.00      0.16      0.00     -0.00      0.00   2581.86      1.00
+#>>>    lambda[3]     -0.00      0.09      0.00     -0.00      0.00   2466.78      1.00
+#>>>    lambda[4]      0.00      0.12      0.00     -0.00     -0.00   2382.43      1.00
+#>>>    lambda[5]     -0.00      0.15      0.00     -0.00     -0.00   1668.96      1.00
+#>>>    lambda[6]      0.00      0.13      0.00      0.00      0.00   2501.39      1.00
+#>>>    lambda[7]     -0.00      0.13      0.00     -0.00     -0.00   2500.01      1.00
+#>>>    lambda[8]     -0.00      0.05      0.00      0.00      0.00   2500.66      1.00
+#>>>    lambda[9]      0.00      0.11      0.00     -0.00     -0.00   2501.21      1.00
+#>>>          psi      1.91      0.21      1.90      1.51      2.34   5349.34      1.00
+#>>>     sigma[0]     13.22      2.62     13.03      8.38     18.38   5794.00      1.00
+#>>>     sigma[1]      0.03      0.49      0.00      0.00      0.00   2524.81      1.00
+#>>>     sigma[2]      0.03      0.49      0.00      0.00      0.00   2474.96      1.00
+#>>>     sigma[3]      0.03      0.40      0.00      0.00      0.00   2121.25      1.00
+#>>>     sigma[4]      0.03      0.44      0.00      0.00      0.00   2456.77      1.00
+#>>>     sigma[5]      0.03      0.49      0.00      0.00      0.00   2296.47      1.00
+#>>>     sigma[6]      0.02      0.29      0.00      0.00      0.00   2526.90      1.00
+#>>>     sigma[7]      0.02      0.29      0.00      0.00      0.00   2525.15      1.00
+#>>>     sigma[8]      0.01      0.24      0.00      0.00      0.00   2514.24      1.00
+#>>>     sigma[9]      0.02      0.34      0.00      0.00      0.00   2362.61      1.00
 
-fig, ax = plt.subplots(figsize=(12,4))
-labels = [
-    r"$y_{ij,t_{m-1}}$",
-    r"ConCoopDiff$_{ij,t_{m-1}}$",
-    r'CommLang$_{ij}$',
-    r'$\log($Dist$_{ij})$']
-
-ls = ['-', '--', '-.', ':']
-for k in range(X.shape[-1]):
-    ax.plot(time_points, ci[1, :, k], linestyle=ls[k], lw=3, label=labels[k])
-    ax.fill_between(time_points, ci[0, :, k], ci[2, :, k], alpha=0.25)
-
-ax.axhline(0, linestyle='--', color='k')
-
-ax.set_xticks([i * 52 for i in range(6)])
-ax.set_xticklabels([2018 + i for i in range(6)], fontsize=20)
-ax.tick_params(axis='both', which='major', labelsize=20)
-ax.grid(axis='x', lw=2)
-ax.set_xlabel('Year', fontsize=24, fontfamily='Arial')
-ax.set_ylabel('Coefficients', fontsize=24, fontfamily='arial')
-ax.legend(loc='upper center', ncols=4, fontsize=20, bbox_to_anchor=(0.5, 1.3))
-
+# diagnostic plots
+glnem.plot(Y_obs=Y)
 plt.show()
-```
-<!--
-<img src="images/coefs_n50.png" width="100%" />
--->
-
-```python
-# plot the latent trajectories of Ukraine and Russia's first coordinate
-
-# NOTE: model.U_ is a (n_time_points, n_nodes, n_features) ndarray holding the 
-# variational posterior means of the latent trajectories that have been
-# post-processed using sequential Procrustes rotations.
-u_ukraine = model.U_[:, 7, 0]  # Ukraine is node 7
-u_russia = model.U_[:, 1, 0]   # Russia is node 1
-
-fig, ax = plt.subplots(figsize=(6, 4))
-ax.plot(time_points, u_ukraine, linewidth=2, label='Ukraine')
-ax.plot(time_points, u_russia, linestyle='--', linewidth=3, label='Russia')
-ax.set_xticks([i * 52 for i in range(6)])
-ax.set_xticklabels([2018 + i for i in range(6)], fontsize=20)
-ax.tick_params(axis='both', which='major', labelsize=20)
-ax.grid(axis='x', lw=2)
-ax.set_xlabel('Year', fontsize=24, fontfamily='Arial')
-ax.set_ylabel('Dimension 1', fontsize=24, fontfamily='arial')
-ax.legend(fontsize=12)
-
-plt.show()
+plt.savefig("nb_diag.png", dpi=600, bbox_inches='tight')
 ```
 
-<!--
-<img src="images/ls_n50.png" width="100%" />
--->
+<img src="images/nb_diag.png" width="100%" />
 
 Simulation Studies and Real-Data Applications
 ---------------------------------------------
