@@ -1,6 +1,6 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/joshloyal/glnem/blob/main/LICENSE)
 
-## A Spike-and-Slab Prior for Generalized Linear Network Eigenmodels (GLNEMs) 
+## A Spike-and-Slab Prior for Generalized Linear Network Eigenmodels
 
 *Author: [Joshua D. Loyal](https://joshloyal.github.io/)*
 
@@ -58,10 +58,12 @@ glnem = GLNEM(family='negbinom', link='log', n_features=10)
 # run the MCMC algorithm for 2,500 warm-up iterations and collect 2,500 post warm-up samples
 glnem.sample(Y, X, n_warmup=2500, n_samples=2500)
 
-# summary of the posterior distribution
-glnem.print_summary()
 #>>> sample: 100%|████████████████████████████████████████████████████████████████████████████████| 500/500 [00:29<00:00, 17.06it/s, 63 steps of size 8.06e-02. acc. prob=0.93]
 #>>> sample: 100%|██████████████████████████████████████████████████████████████████████████████| 5000/5000 [02:01<00:00, 41.19it/s, 63 steps of size 9.46e-02. acc. prob=0.91]
+
+# summary of the posterior distribution
+glnem.print_summary()
+
 #>>> WAIC: 3808.051
 #>>> 
 #>>>                   mean       std    median      2.5%     97.5%     n_eff     r_hat
