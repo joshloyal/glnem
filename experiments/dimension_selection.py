@@ -21,9 +21,9 @@ from glnem.model_selection import kfold_selection, ic_selection
 set_host_device_count(10)
 numpyro.enable_x64()
 
-family = 'bernoulli'
-link = 'logit'
-dispersion = 0.5
+family = 'gaussian'
+link = 'identity'
+dispersion = 5.0
 
 
 def compare_latent_space(U_pred, U_true):
@@ -69,8 +69,8 @@ def compare_latent_space(U_pred, U_true):
 #    return n_features, loglik / n_folds
 
 
-Y, X, params = synthetic_network(n_nodes=100, family=family, link=link,
-        intercept=-1.0, n_features=3, n_covariates=4, random_state=0,
+Y, X, params = synthetic_network(n_nodes=200, family=family, link=link,
+        intercept=1.0, n_features=3, n_covariates=4, random_state=1,
         dispersion=dispersion, var_power=1.6)
 print(Y.mean())
 

@@ -21,9 +21,9 @@ def train_test_split(Y, test_size=0.2, random_state=None):
     tril_indices = np.tril_indices(n_nodes, k=-1)
     rs = ShuffleSplit(
             n_splits=1, test_size=test_size, random_state=random_state)
-    _, test = next(rs.split(y))
+    train, test = next(rs.split(y))
  
-    return test
+    return train, test
 
 
 def kfold(Y, n_splits=4, random_state=None):

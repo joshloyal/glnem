@@ -15,7 +15,7 @@ from numpyro.infer.util import log_density
 from numpyro.infer import init_to_value, init_to_uniform, init_to_feasible, init_to_median
 from numpyro.infer import SVI, Trace_ELBO, autoguide
 from numpyro.diagnostics import print_summary as numpyro_print_summary
-from scipy.optimize import linear_sum_assignment
+from scipy.linalg import orthogonal_procrustes
 
 from jax import jit, random, vmap
 from jax.nn import relu
@@ -27,21 +27,23 @@ from .mcmc_utils import (Phi, polar_decomposition, centered_qr_decomposition,
         centered_projected_normal)
 from .mcmc_utils import condition
 from .network_utils import adjacency_to_vec
-from .plots import plot_glnem
+from .plots import plot_lpm
 from .diagnostics import get_distribution
 
 
-__all__ = ['GLNEM']
+__all__ = ['LatentPositionModel']
 
 
 
-def find_permutation(U, U_ref):
-    n_features = U.shape[1]
-    C = U_ref.T @ U
-    perm = linear_sum_assignment(np.maximum(C, -C), maximize=True)[1]
-    sign = np.sign(C[np.arange(n_features), perm])
-    return sign * U[..., perm], perm
+def pairwise_distance(U):
+    U_norm_sq = jnp.sum(U ** 2, axis=1).reshape(-1, 1)
+    dist_sq = U_norm_sq + U_norm_sq.T - 2 * U @ U.T
+    return dist_sq
 
+
+def find_rotation(U, U_ref):
+    R, _ = orthogonal_procrustes(U, U_ref)
+    return U @ R
 
 def posterior_predictive(model, rng_key, samples, stat_fun, *model_args,
                          **model_kwargs):
@@ -143,44 +145,17 @@ LINK_FUNCS = {
 }
 
 
-def glnem(Y, Z, n_nodes, train_indices,
-          n_features=2, v0=0., family='bernoulli', link='identity',
-          infer_dimension=False,
-          is_predictive=False):
+def lpm(Y, Z, n_nodes, train_indices,
+        n_features=2, family='bernoulli', link='identity', ls_type='distance',
+        is_predictive=False):
 
-    # sparsity factor
-    eps = 1e-3 * n_nodes
-    if infer_dimension:
-        sigmak = numpyro.sample("sigmak",
-            dist.Exponential(rate=1/n_nodes).expand([n_features]))
-    else:
-        sigmak = jnp.repeat(n_nodes, n_features)
-
-    if infer_dimension:
-        # Spike-and-Slab IBP
-        v1 = numpyro.sample("v1", dist.Beta(
-            (1/n_features), 1 + n_features ** (1. + eps)))
-        vh = numpyro.sample("vh", dist.Beta(
-            (1/n_features) * jnp.ones(n_features-1), jnp.ones(n_features - 1)))
-        v = numpyro.deterministic("v", jnp.concatenate((jnp.array([v1]), vh)))
-        w = numpyro.deterministic("w", jnp.cumprod(v))
-        s = numpyro.sample("s", dist.Bernoulli(probs=w))
-        z = numpyro.deterministic("z", s)
-        thetak = jnp.where(s, 1, jnp.sqrt(v0))
-    else:
-        thetak = 1.
-    
-    sigma = numpyro.deterministic('sigma', thetak * jnp.sqrt(sigmak))
-
-    # lambda values
-    lmbda0 = numpyro.sample("lambda0", dist.Normal(0, 1).expand([n_features]))
-    lmbda = numpyro.deterministic("lambda", sigma * lmbda0)
+    sigma = numpyro.sample('sigma', dist.InverseGamma(1.5, 1.5)) # 1 * invX2(1)
 
     # latent space
     X = numpyro.sample("X",
         dist.Normal(jnp.zeros((n_nodes, n_features)),
                     jnp.ones((n_nodes, n_features))))
-    U = numpyro.deterministic("U", centered_qr_decomposition(X))
+    U = numpyro.deterministic("U", jnp.sqrt(sigma) * X)
 
     # intercept
     intercept = numpyro.sample('intercept', dist.Normal(0, 10))
@@ -209,11 +184,16 @@ def glnem(Y, Z, n_nodes, train_indices,
     else:
         var_power = numpyro.deterministic('var_power', 0.0)
 
-    # bilinear predictor
+    # euclidean distance predictor
     subdiag = jnp.tril_indices(n_nodes, k=-1)
-
-    ULUt = ((U * lmbda) @ U.T)[subdiag]
-    eta = intercept + ULUt
+    if ls_type == 'distance':
+        dis = pairwise_distance(U)
+        eta = intercept - jnp.sqrt(dis[subdiag])
+    elif ls_type == 'distance_sq':
+        dis = pairwise_distance(U)
+        eta = intercept - dis[subdiag] 
+    else:
+        eta = intercept + (U @ U.T)[subdiag]
 
     if Z is not None:
         eta += Z @ coefs
@@ -248,39 +228,36 @@ def glnem(Y, Z, n_nodes, train_indices,
 
     if is_predictive:
         mu = LINK_FUNCS[link](eta)
-        numpyro.deterministic("similarities", ULUt)
+        numpyro.deterministic("similarities", dist)
         numpyro.deterministic("linear_predictor", eta)
         numpyro.deterministic("mean", mu)
         numpyro.deterministic("zero_probas", 
                 calculate_zero_probas(mu, family, dispersion, var_power))
 
 
-class GLNEM(object):
-    """Generalized Linear Network Eigenmodel"""
+class LatentPositionModel(object):
+    """Latent Position Model"""
     def __init__(self,
-                 n_features=8,
+                 n_features=2,
                  family='bernoulli',
                  link='logit',
-                 infer_dimension=True,
-                 v0=0.,
+                 ls_type='distance',
                  random_state=42):
         self.n_features = n_features
-        self.infer_dimension = infer_dimension
-        self.v0 = v0
         self.family = family
         self.link = link
+        self.ls_type = ls_type
         self.random_state = random_state
     
     @property
     def model_args_(self):
         n_nodes = self.samples_['U'].shape[1]
-        return (None, self.X_dyad_, n_nodes, True, self.n_features, self.v0, 
-                self.family, self.link)
+        return (None, self.X_dyad_, n_nodes, True, self.n_features,  
+                self.family, self.link, self.ls_type)
 
     @property
     def model_kwargs_(self):
-        return {'infer_dimension': self.infer_dimension,
-                'is_predictive': True}
+        return {'is_predictive': True}
     
     @property
     def n_params_(self):
@@ -290,7 +267,6 @@ class GLNEM(object):
         n_covariates = self.coefs_.shape[0] if self.coefs_ is not None else 0
         return (
                 np.prod(self.U_.shape) +    # latent space
-                self.n_features +           # lambda 
                 n_covariates + 1    # covariate-effects + intercept
         )
 
@@ -326,37 +302,17 @@ class GLNEM(object):
         rng_key = random.PRNGKey(self.random_state)
         model_args = (
             y, self.X_dyad_, n_nodes, self.train_indices_, self.n_features, 
-            self.v0, self.family, self.link)
-        model_kwargs = {
-            'infer_dimension': self.infer_dimension,
-            'is_predictive': False}
+            self.family, self.link, self.ls_type)
+        model_kwargs = {'is_predictive': False}
+        init_values = init_to_uniform()
 
-        if self.infer_dimension:
-            kernel = NUTS(glnem, target_accept_prob=adapt_delta)
-            mcmc = MCMC(kernel, num_warmup=250, num_samples=250, num_chains=1)
-            init_kwargs = model_kwargs.copy()
-            init_kwargs['infer_dimension'] = False
-            mcmc.run(rng_key, *model_args, **init_kwargs)
-            init_values = init_to_value(values={
-                key: value[-1] for key, value in mcmc.get_samples().items()
-            })
-        else:
-            init_values = init_to_uniform()
-
-        kernel = NUTS(glnem, target_accept_prob=adapt_delta,
+        kernel = NUTS(lpm, target_accept_prob=adapt_delta,
                       init_strategy=init_values)
         
-        if self.infer_dimension:
-            kernel = DiscreteHMCGibbs(kernel, modified=False)
-
         mcmc = MCMC(kernel, num_warmup=n_warmup, num_samples=n_samples,
                     thinning=thinning, num_chains=1)
         mcmc.run(rng_key, *model_args, **model_kwargs)
-
-        if not self.infer_dimension:
-            self.diverging_ = jnp.sum(mcmc.get_extra_fields()['diverging'])
-        else:
-            self.diverging_ = None
+        self.diverging_ = None
 
         # extract/process samples
         self.samples_ = mcmc.get_samples()
@@ -364,7 +320,7 @@ class GLNEM(object):
         # calculate log density
         self.logp_ = vmap(
             lambda sample : log_density(
-                glnem, model_args=model_args, model_kwargs=model_kwargs,
+                lpm, model_args=model_args, model_kwargs=model_kwargs,
                 params=sample)[0])(self.samples_)
         self.map_idx_ = np.argmax(self.logp_)
 
@@ -394,47 +350,13 @@ class GLNEM(object):
         # fix permutation issue for each sample
         U_ref = self.samples_['U'][self.map_idx_]
         for idx in range(self.samples_['U'].shape[0]):
-            self.samples_['U'][idx], perm = find_permutation(
+            self.samples_['U'][idx] = find_rotation(
                 self.samples_['U'][idx], U_ref)
-            self.samples_['lambda'][idx] = (
-                self.samples_['lambda'][idx, perm].T)
-            self.samples_['sigma'][idx] = (
-                self.samples_['sigma'][idx, perm].T)
-
-            if self.infer_dimension:
-                self.samples_['s'][idx] = self.samples_['s'][idx, perm]
-                self.samples_['z'][idx] = self.samples_['z'][idx, perm]
-
-        if self.infer_dimension:
-            # order columns based on inclusion probabilities and then by lmbda
-            self.inclusion_probas_ = self.samples_['s'].mean(axis=0)
-            imp_perm = np.lexsort(
-                (self.samples_['lambda'].mean(axis=0),
-                 self.inclusion_probas_))[::-1]
-            self.inclusion_probas_ = self.inclusion_probas_[imp_perm]
-            for idx in range(self.samples_['U'].shape[0]):
-                self.samples_['U'][idx] = self.samples_['U'][idx][:, imp_perm]
-                self.samples_['lambda'][idx] = (
-                    self.samples_['lambda'][idx, imp_perm].T)
-                self.samples_['sigma'][idx] = self.samples_['sigma'][idx, imp_perm]
-                self.samples_['s'][idx] = self.samples_['s'][idx, imp_perm]
-                self.samples_['z'][idx] = self.samples_['z'][idx, imp_perm]
-        else:
-            # order columns based on magnitude of lambda
-            imp_perm = np.argsort(self.samples_['lambda'].mean(axis=0))[::-1]
-            for idx in range(self.samples_['U'].shape[0]):
-                self.samples_['U'][idx] = self.samples_['U'][idx][:, imp_perm]
-                self.samples_['lambda'][idx] = (
-                    self.samples_['lambda'][idx, imp_perm].T)
-                self.samples_['sigma'][idx] = self.samples_['sigma'][idx, imp_perm]
-
 
         # posterior means
         self.sigma_ = self.samples_['sigma'].mean(axis=0)
-        self.lambda_ = self.samples_['lambda'].mean(axis=0)
         self.intercept_ = self.samples_['intercept'].mean(axis=0)
-        self.U_mean_ = self.samples_['U'].mean(axis=0)
-        self.U_ = np.asarray(polar_decomposition(self.U_mean_))
+        self.U_ = self.samples_['U'].mean(axis=0)
 
         return self
 
@@ -449,11 +371,11 @@ class GLNEM(object):
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
 
         model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
-                self.v0, self.family, self.link)
+                self.family, self.link)
         
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *model_args, **self.model_kwargs_))(*vmap_args)
 
         lppd = (logsumexp(loglik, axis=0) - jnp.log(n_samples)).sum()
@@ -471,11 +393,11 @@ class GLNEM(object):
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
         
         model_args = (y, X_dyad, n_nodes, train_indices, self.n_features, 
-                self.v0, self.family, self.link)
+                self.family, self.link)
 
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *model_args, **self.model_kwargs_))(*vmap_args)
 
         loglik_hat = self.loglikelihood()
@@ -507,7 +429,7 @@ class GLNEM(object):
 
         return np.asarray(vmap(
             lambda samples, rng_key : posterior_predictive(
-                glnem, rng_key, samples, stat_fun,
+                lpm, rng_key, samples, stat_fun,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args))
     
@@ -519,7 +441,8 @@ class GLNEM(object):
         n_nodes = self.U_.shape[0]
 
         subdiag = np.tril_indices(n_nodes, k=-1)
-        eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[subdiag]
+        dis = pairwise_distances(U)
+        eta = self.intercept_ - np.sqrt(dis[subdiag]) 
         if X is not None:
             eta += X @ self.coefs_
 
@@ -544,7 +467,7 @@ class GLNEM(object):
 
         return np.asarray(vmap(
             lambda samples, rng_key : predict(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
     
@@ -555,7 +478,7 @@ class GLNEM(object):
 
         return np.asarray(vmap(
             lambda samples, rng_key : linear_predictor(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
     
@@ -566,7 +489,7 @@ class GLNEM(object):
 
         return np.asarray(vmap(
             lambda samples, rng_key : similarities(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
     
@@ -577,7 +500,7 @@ class GLNEM(object):
 
         return np.asarray(vmap(
             lambda samples, rng_key : predict_zero_probas(
-                glnem, rng_key, samples,
+                lpm, rng_key, samples,
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
 
@@ -586,4 +509,4 @@ class GLNEM(object):
                 self.samples_, self.feature_names_, self.diverging_, prob=proba)
 
     def plot(self, Y_obs=None, include_diagnostics=True, **fig_kwargs):
-        return plot_glnem(self, Y_obs, include_diagnostics, **fig_kwargs)
+        return plot_lpm(self, Y_obs, include_diagnostics, **fig_kwargs)

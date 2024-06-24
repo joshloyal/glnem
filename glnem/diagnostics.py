@@ -36,7 +36,7 @@ def quantile_residuals(y, y_hat, dispersion=0., var_power=1.5, family='poisson',
     return norm.ppf(rng.uniform(lower, upper))
 
 
-def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_prob=0.1):
+def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_prob=0.1, df=5):
 
     if family == 'bernoulli':
         dis = dist.Bernoulli(mu)
@@ -52,6 +52,10 @@ def get_distribution(mu, dispersion=1., var_power=1.5, family='bernoulli', zif_p
         dis = dist.NegativeBinomial2(mean=mu, concentration=1/dispersion)
     elif family == 'gaussian':
         dis = dist.Normal(mu, dispersion)
+    elif family == 't':
+        dis = dist.StudentT(df, mu, dispersion)
+    elif family == 'laplace':
+        dis = dist.Laplace(mu, dispersion)
     else:
         raise ValueError()
     
