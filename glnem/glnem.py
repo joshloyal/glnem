@@ -145,8 +145,7 @@ LINK_FUNCS = {
 
 def glnem(Y, Z, n_nodes, train_indices,
           n_features=2, v0=0., family='bernoulli', link='identity',
-          infer_dimension=False, include_diag=False,
-          is_predictive=False):
+          infer_dimension=False, is_predictive=False):
 
     # sparsity factor
     eps = 1e-3 * n_nodes
@@ -210,8 +209,7 @@ def glnem(Y, Z, n_nodes, train_indices,
         var_power = numpyro.deterministic('var_power', 0.0)
 
     # bilinear predictor
-    k = 0 if include_diag else -1 
-    indices = jnp.tril_indices(n_nodes, k=k)
+    indices = jnp.tril_indices(n_nodes, k=-1)
     ULUt = ((U * lmbda) @ U.T)[indices]
     eta = intercept + ULUt
 
@@ -262,12 +260,10 @@ class GLNEM(object):
                  family='bernoulli',
                  link='logit',
                  infer_dimension=True,
-                 include_diag=False,
                  v0=0.,
                  random_state=42):
         self.n_features = n_features
         self.infer_dimension = infer_dimension
-        self.include_diag = include_diag
         self.v0 = v0
         self.family = family
         self.link = link
@@ -282,7 +278,6 @@ class GLNEM(object):
     @property
     def model_kwargs_(self):
         return {'infer_dimension': self.infer_dimension,
-                'include_diag': self.include_diag,
                 'is_predictive': True}
     
     @property
@@ -304,7 +299,7 @@ class GLNEM(object):
 
         # network to dyad list
         n_nodes = Y.shape[0]
-        y = adjacency_to_vec(Y, self.include_diag)
+        y = adjacency_to_vec(Y)
         self.y_fit_ = y
 
         if missing_edges is not None:
@@ -330,7 +325,6 @@ class GLNEM(object):
             self.v0, self.family, self.link)
         model_kwargs = {
             'infer_dimension': self.infer_dimension,
-            'include_diag': self.include_diag,
             'is_predictive': False}
 
         if self.infer_dimension:
@@ -446,7 +440,7 @@ class GLNEM(object):
         n_nodes = self.samples_['U'].shape[1]
         vmap_args = (self.samples_, random.split(rng_key, n_samples))
         
-        y = adjacency_to_vec(Y, self.include_diag) if Y is not None else self.y_fit_
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         train_indices = True if Y is not None else self.train_indices_
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
 
@@ -468,7 +462,7 @@ class GLNEM(object):
         n_nodes = self.samples_['U'].shape[1]
         vmap_args = (self.samples_, random.split(rng_key, n_samples))
 
-        y = adjacency_to_vec(Y, self.include_diag) if Y is not None else self.y_fit_
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         train_indices = True if Y is not None else self.train_indices_
         X_dyad = jnp.asarray(X) if X is not None else self.X_dyad_
         
@@ -514,14 +508,13 @@ class GLNEM(object):
         )(*vmap_args))
     
     def loglikelihood(self, Y=None, test_indices=None):
-        y = adjacency_to_vec(Y, self.include_diag) if Y is not None else self.y_fit_
+        y = adjacency_to_vec(Y) if Y is not None else self.y_fit_
         X = self.X_dyad_
 
         n_dyads = y.shape[0]
         n_nodes = self.U_.shape[0]
         
-        k = 0 if self.include_diag else -1
-        indices = np.tril_indices(n_nodes, k=k)
+        indices = np.tril_indices(n_nodes, k=-1)
         eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[indices]
         if X is not None:
             eta += X @ self.coefs_

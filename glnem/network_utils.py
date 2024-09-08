@@ -36,3 +36,17 @@ def dynamic_adjacency_to_vec(Y):
         y = y.at[t].set(Y[t][subdiag].astype('int32'))
 
     return y
+
+
+def node_averaged_rank(X_dyad):
+    n_dyads, n_covariates = X_dyad.shape
+    n_nodes = int(-0.5 + 0.5 * np.sqrt(1 + 8 * n_dyads))
+    X = np.zeros((n_nodes, n_nodes, n_covariates))
+    for k in range(n_covariates):
+        X[..., k] = vec_to_adjacency(X_dyad[..., k], include_diag=True)
+    
+    # calculate node-averaged covariates
+    Xbar = X.mean(axis=0)
+    Xbar = np.c_[np.ones(n_nodes), Xbar]  # add intercept column
+
+    return np.linalg.matrix_rank(Xbar)
