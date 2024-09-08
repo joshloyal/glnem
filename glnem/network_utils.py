@@ -7,22 +7,24 @@ def shape_from_tril_vec(x, k=0):
     return round((np.sqrt(1 + 8 * x.shape[-1]) - 1) / 2) - k
 
 
-def vec_to_adjacency(y_vec, include_nan=False):
-    n = shape_from_tril_vec(y_vec, k=-1)
-    indices = np.tril_indices(n, k=-1)
-    Y = jnp.zeros((n, n))
-    Y = Y.at[indices].set(y_vec)
+def vec_to_adjacency(y_vec, include_diag=False):
+    k = 0 if include_diag else -1
+    n = shape_from_tril_vec(y_vec, k=k)
+    indices = np.tril_indices(n, k=k)
+    Y = np.zeros((n, n))
+    Y[indices] = y_vec
     Y += Y.T
-    if include_nan:
-        Y.at[jnp.diag_indices(n)].set(jnp.nan)
+    Y[np.diag_indices_from(Y)] *= 0.5
     return Y
 
 
-def adjacency_to_vec(Y):
+def adjacency_to_vec(Y, include_diag=False):
     n_nodes = Y.shape[0]
-    n_dyads = int(0.5 * n_nodes * (n_nodes - 1))
-    subdiag = np.tril_indices(n_nodes, k=-1)
-    return Y[subdiag]
+    if include_diag:
+        indices = np.tril_indices(n_nodes)
+    else:
+        indices = np.tril_indices(n_nodes, k=-1)
+    return Y[indices]
 
 
 def dynamic_adjacency_to_vec(Y):
