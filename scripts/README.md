@@ -37,7 +37,7 @@ To produce the results and figures, you will need to run the cells in the corres
 >>> jupyter notebook Banana\ Trade.ipynb
 ```
 
-This notebook produces Figure 3, Figure S7, Figure S8, and Figure S15.
+This notebook produces Figure 3, Figure S7, Figure S8, Figure S14, and Figure S15.
 
 ### Section 5.3 of the supplement (Sensitivity to zero-inflation)
 
