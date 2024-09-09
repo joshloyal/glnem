@@ -37,7 +37,7 @@ def compare_latent_space(U_pred, U_true):
     return corr, mse, perm
 
 
-def simulation(seed, n_nodes=100, family='bernoulli', select_type='ss', max_features=8):
+def simulation(seed, n_nodes=100, family='bernoulli', max_features=8):
     seed = int(seed)
     n_nodes = int(n_nodes)
     max_features = int(max_features)
@@ -63,58 +63,49 @@ def simulation(seed, n_nodes=100, family='bernoulli', select_type='ss', max_feat
 
     model_family = 'poisson' if family == 'zif_poisson' else family
 
-    # information criteria
-    if select_type == 'ic':
-        data = ic_selection(
-            Y, X, model_family, link, max_features=max_features, n_warmup=n_warmup, n_samples=n_samples)
-    elif select_type == 'cv':
-        data = kfold_selection(
-            Y, X, model_family, link, max_features=max_features, n_warmup=n_warmup, n_samples=n_samples,
-            n_folds=5)
-    else:
-        model = GLNEM(family=model_family, link=link, n_features=max_features, random_state=123)
+    model = GLNEM(family=model_family, link=link, n_features=max_features, random_state=123)
 
-        model.sample(Y, X=X, n_warmup=n_warmup, n_samples=n_samples)
-        
-        # posterior dimension summaries
-        s = model.samples_['s'].sum(axis=1)
-        d_mean = s.mean()
-        d_hat = stats.mode(s)[0]
+    model.sample(Y, X=X, n_warmup=n_warmup, n_samples=n_samples)
+    
+    # posterior dimension summaries
+    s = model.samples_['s'].sum(axis=1)
+    d_mean = s.mean()
+    d_hat = stats.mode(s)[0]
 
-        d_post = np.bincount(
-            model.samples_['s'].sum(axis=1).astype(int),
-            minlength=model.n_features+1)[1:]
-        d_post = d_post / model.samples_['s'].shape[0]
+    d_post = np.bincount(
+        model.samples_['s'].sum(axis=1).astype(int),
+        minlength=model.n_features+1)[1:]
+    d_post = d_post / model.samples_['s'].shape[0]
 
-        data = pd.DataFrame({
-            'd': np.arange(1, max_features + 1),
-            'inclusion_probas': model.inclusion_probas_,
-            'd_post': d_post})
-        data['d_mean'] = d_mean
-        data['d_hat'] = d_hat
+    data = pd.DataFrame({
+        'd': np.arange(1, max_features + 1),
+        'inclusion_probas': model.inclusion_probas_,
+        'd_post': d_post})
+    data['d_mean'] = d_mean
+    data['d_hat'] = d_hat
 
-        # latent space error
-        n_features = params['U'].shape[1]
-        corr, mse, perm = compare_latent_space(model.U_[..., :n_features], params['U'])
-        data['U_corr'] = corr
-        data['U_rel'] = mse
+    # latent space error
+    n_features = params['U'].shape[1]
+    corr, mse, perm = compare_latent_space(model.U_[..., :n_features], params['U'])
+    data['U_corr'] = corr
+    data['U_rel'] = mse
 
-        # lambda error
-        lmbda_pred = model.lambda_[:n_features]
-        lmbda = params['lambda']
-        data['lambda_rel'] = np.sum((lmbda_pred[perm] - lmbda) ** 2) / np.sum(lmbda ** 2)
+    # lambda error
+    lmbda_pred = model.lambda_[:n_features]
+    lmbda = params['lambda']
+    data['lambda_rel'] = np.sum((lmbda_pred[perm] - lmbda) ** 2) / np.sum(lmbda ** 2)
 
-        # coefs relative error
-        num = np.sum((model.coefs_ - params['coefs']) ** 2) + (model.intercept_ - params['intercept']) ** 2
-        dem = np.sum(params['coefs'] ** 2) + params['intercept'] ** 2
-        data['coef_rel'] = num / dem
+    # coefs relative error
+    num = np.sum((model.coefs_ - params['coefs']) ** 2) + (model.intercept_ - params['intercept']) ** 2
+    dem = np.sum(params['coefs'] ** 2) + params['intercept'] ** 2
+    data['coef_rel'] = num / dem
 
-        # ULUt relative error
-        sims = model.similarities()
-        data['sim_rel'] = np.sum((sims - params['similarities']) ** 2) / np.sum(params['similarities'] ** 2)
+    # ULUt relative error
+    sims = model.similarities()
+    data['sim_rel'] = np.sum((sims - params['similarities']) ** 2) / np.sum(params['similarities'] ** 2)
 
-    out_file = f'result_{family}_{select_type}_{seed}.csv'
-    dir_base = f'output_{select_type}_d{max_features}'
+    out_file = f'result_{family}_ss_{seed}.csv'
+    dir_base = f'output_ss_d{max_features}'
     dir_name = os.path.join('output_recovery_dim_select_sensitivity', dir_base, f"{family}_n{n_nodes}")
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
@@ -139,19 +130,3 @@ for max_features in [6, 8, 12]:
         for n_nodes in node_map[family]:
             for i in range(n_reps):
                 simulation(seed=i, n_nodes=n_nodes, family=family, select_type='ss', max_features=max_features)
-
-    # information criteria
-    for family in ['bernoulli', 'gaussian', 'poisson', 'negbinom', 'tweedie']:
-        for n_nodes in node_map[family]:
-            for i in range(n_reps):
-                simulation(seed=i, n_nodes=n_nodes, family=family, select_type='ic', max_features=max_features)
-
-    # cross-validation
-    for family in ['bernoulli', 'gaussian', 'poisson', 'negbinom', 'tweedie']:
-        for n_nodes in node_map[family]:
-            # do not run CV for largest network sizes for negbinom and tweedie (takes too long)
-            if (family == 'negbinom' and n_nodes == 200) or (family == 'tweedie' and n_nodes == 150):
-                continue
-
-            for i in range(n_reps):
-                simulation(seed=i, n_nodes=n_nodes, family=family, select_type='cv', max_features=max_features)
