@@ -116,7 +116,7 @@ def simulation(seed, n_nodes=100, family='bernoulli', select_type='ss', max_feat
 
     out_file = f'result_{family}_{select_type}_{seed}.csv'
     dir_base = f'output_{select_type}_d{max_features}'
-    dir_name = os.path.join('output_parameter_recovery', dir_base, f"{family}_n{n_nodes}")
+    dir_name = os.path.join('output_recovery_dim_select', dir_base, f"{family}_n{n_nodes}")
     if not os.path.exists(dir_name):
         os.makedirs(dir_name)
 
@@ -127,14 +127,31 @@ def simulation(seed, n_nodes=100, family='bernoulli', select_type='ss', max_feat
 n_reps = 50
 
 node_map = {
-    'bernoulli': [25],
+    'bernoulli': [100, 200, 300],
     'gaussian': [100, 200, 300],
     'poisson': [100, 200, 300],
     'negbinom': [100, 150, 200],
     'tweedie': [50, 100, 150]
 }
-            
+
+# spike and slab prior
 for family in ['bernoulli', 'gaussian', 'poisson', 'negbinom', 'tweedie']:
     for n_nodes in node_map[family]:
         for i in range(n_reps):
             simulation(seed=i, n_nodes=n_nodes, family=family, select_type='ss', max_features=max_features)
+
+# information criteria
+for family in ['bernoulli', 'gaussian', 'poisson', 'negbinom', 'tweedie']:
+    for n_nodes in node_map[family]:
+        for i in range(n_reps):
+            simulation(seed=i, n_nodes=n_nodes, family=family, select_type='ic', max_features=max_features)
+
+# cross-validation
+for family in ['bernoulli', 'gaussian', 'poisson', 'negbinom', 'tweedie']:
+    for n_nodes in node_map[family]:
+        # do not run CV for largest network sizes for negbinom and tweedie (takes too long)
+        if (family == 'negbinom' and n_nodes == 200) or (family == 'tweedie' and n_nodes == 150):
+            continue
+
+        for i in range(n_reps):
+            simulation(seed=i, n_nodes=n_nodes, family=family, select_type='cv', max_features=max_features)
