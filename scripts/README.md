@@ -8,7 +8,7 @@ The following commands run the simulations or real data analysis and produce the
 
 ### Section 6.2 and Section 6.3 (Parameter Recovery and Dimension Selection)
 
-These commands run the simulations and produce Table 1, Figure 1, and Figure 2.
+These commands run the simulations and produces Table 1, Figure 1, and Figure 2.
 
 ```bash
 >>> python simulation_recovery_dim_select.py
@@ -19,7 +19,7 @@ These commands run the simulations and produce Table 1, Figure 1, and Figure 2.
 
 ### Section 5.6 of the supplement (Sensitivity to d)
 
-These commands run the simulations and produce Figure S2, Table S7, and Table S8.
+These commands run the simulations and produces Figure S2, Table S7, and Table S8.
 
 ```bash
 >>> python simulation_recovery_dim_select_sensitivity.py
@@ -41,7 +41,7 @@ This notebook produces Figure 3, Figure S7, Figure S8, and Figure S15.
 
 ### Section 5.3 of the supplement (Sensitivity to zero-inflation)
 
-The following commands runs the simulations and produce Figure S1, Table S1, and Table S2.
+The following commands runs the simulations and produces Figure S1, Table S1, and Table S2.
 
 ```bash
 >>> python simulation_zero_inflation.py
@@ -53,13 +53,12 @@ The following commands runs the simulations and produce Figure S1, Table S1, and
 
 ### Section 5.4 of the supplement (Sensitivity to heavy-tailed distributions)
 
-The following commands runs the simulations and produce Figure 7(b).
+The following commands runs the simulations and produces Table S3.
 
 ```bash
->>> python simulation_time_fraction_sensitivity.py
->>> cd output_time_fraction_sensitivty/
->>> python process.py
->>> python plot.py
+>>> python simulation_heavy_tails.py
+>>> cd output_heavy_tails/
+>>> python make_table.py
 ```
 
 
