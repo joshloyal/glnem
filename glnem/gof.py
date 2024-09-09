@@ -12,7 +12,7 @@ def density(y_vec):
 
 
 def std_degree(y_vec, is_vec=False):
-    Y = vec_to_adjacency(y_vec, include_nan=True)
+    Y = vec_to_adjacency(y_vec)
     # ignore diagonal entries
     return jnp.nanstd(jnp.nansum(Y, axis=1), ddof=1)
 
@@ -29,7 +29,7 @@ def degree_distribution(degrees):
 
 
 def transitivity(y_vec):
-    Y = vec_to_adjacency(y_vec, include_nan=False)
+    Y = vec_to_adjacency(y_vec)
     n_triangles = jnp.trace(jnp.linalg.matrix_power(Y, 3))
     Y_sq = Y @ Y
     n_triplets = jnp.sum(Y_sq) - jnp.trace(Y_sq)

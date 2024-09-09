@@ -11,7 +11,7 @@ from ..tweedie import Tweedie
 from ..network_utils import vec_to_adjacency
 
 
-__all__ = ['synthetic_network']
+__all__ = ['synthetic_network', 'synthetic_lpm_network']
 
 
 def centered_qr_decomposition(X):

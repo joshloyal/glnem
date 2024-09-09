@@ -145,8 +145,7 @@ LINK_FUNCS = {
 
 def glnem(Y, Z, n_nodes, train_indices,
           n_features=2, v0=0., family='bernoulli', link='identity',
-          infer_dimension=False,
-          is_predictive=False):
+          infer_dimension=False, is_predictive=False):
 
     # sparsity factor
     eps = 1e-3 * n_nodes
@@ -210,9 +209,8 @@ def glnem(Y, Z, n_nodes, train_indices,
         var_power = numpyro.deterministic('var_power', 0.0)
 
     # bilinear predictor
-    subdiag = jnp.tril_indices(n_nodes, k=-1)
-
-    ULUt = ((U * lmbda) @ U.T)[subdiag]
+    indices = jnp.tril_indices(n_nodes, k=-1)
+    ULUt = ((U * lmbda) @ U.T)[indices]
     eta = intercept + ULUt
 
     if Z is not None:
@@ -303,8 +301,6 @@ class GLNEM(object):
         n_nodes = Y.shape[0]
         y = adjacency_to_vec(Y)
         self.y_fit_ = y
-        #train_indices = y != -1
-        #self.train_indices_ = train_indices
 
         if missing_edges is not None:
             self.train_indices_ = np.repeat(True, y.shape[0])
@@ -517,9 +513,9 @@ class GLNEM(object):
 
         n_dyads = y.shape[0]
         n_nodes = self.U_.shape[0]
-
-        subdiag = np.tril_indices(n_nodes, k=-1)
-        eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[subdiag]
+        
+        indices = np.tril_indices(n_nodes, k=-1)
+        eta = self.intercept_ + ((self.U_ * self.lambda_) @ self.U_.T)[indices]
         if X is not None:
             eta += X @ self.coefs_
 
@@ -581,7 +577,7 @@ class GLNEM(object):
                 *self.model_args_, **self.model_kwargs_)
         )(*vmap_args).mean(axis=0))
 
-    def print_summary(self, proba=0.9):
+    def print_summary(self, proba=0.95):
         print_summary(self,
                 self.samples_, self.feature_names_, self.diverging_, prob=proba)
 
