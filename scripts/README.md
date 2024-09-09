@@ -19,7 +19,7 @@ These commands run the simulations and produce Table 1, Figure 1, and Figure 2.
 
 ### Section 5.6 of the supplement (Sensitivity to d)
 
-These commands run the simulations and produce Figure S2, Table S7, and Table S8
+These commands run the simulations and produce Figure S2, Table S7, and Table S8.
 
 ```bash
 >>> python simulation_recovery_dim_select_sensitivity.py
@@ -29,13 +29,15 @@ These commands run the simulations and produce Figure S2, Table S7, and Table S8
 >>> python parameter_recovery_table.py 12
 ```
 
-### Section 7 and BLANK (Banana Trade Network Analysis)
+### Section 7 and Sections 7.3 and 8 of the supplement (Banana Trade Network Analysis)
 
-To produce the figures, you will need to run the cells in the corresponding Jupyter notebook:
+To produce the results and figures, you will need to run the cells in the corresponding Jupyter notebook:
 
 ```bash
->>> jupyter notebook application_POLECAT.ipynb
+>>> jupyter notebook Banana\ Trade.ipynb
 ```
+
+This notebook produces Figure 3, Figure S7, Figure S8, and Figure S15.
 
 ### Section 5.3 of the supplement (Sensitivity to zero-inflation)
 
