@@ -17,7 +17,7 @@ def load_banana_trade(max_nodes=None, include_diag=False):
     if include_diag:
         A = joblib.load(join(base_path, f'banana_diag.npy'))
         countries = pd.read_csv(
-                join(base_path, f'countries_diag.csv')).values[:, -1]
+                join(base_path, f'countries_banana_diag.npy')).values[:, -1]
     else:
         A = joblib.load(join(base_path, f'banana.npy'))
         countries = pd.read_csv(
