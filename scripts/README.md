@@ -76,7 +76,22 @@ The following commands runs the simulations and produces Table S4, Table S5, and
 >>> python coef_recovery_table.py bilinear
 ```
 
-### Section 7.1 of the supplement (Protein-Protein interaction network)
+### Sections 7.1, 7.3, and 8 of the supplement (Protein-Protein interaction network)
 
+To produce the results and figures, you will need to run the cells in the corresponding Jupyter notebook:
 
-### Section 7.2 of the supplement (Host-Parasite interaction network)
+```bash
+>>> jupyter notebook Protein\ Interaction\ Network.ipynb
+```
+
+This notebook produces Figure S3, Figure S4, Figure S9, and Figure S16.
+
+### Section 7.2, 7.3, and 8 of the supplement (Host-Parasite interaction network)
+
+To produce the results and figures, you will need to run the cells in the corresponding Jupyter notebook:
+
+```bash
+>>> jupyter notebook Host\ Parasite.ipynb
+```
+
+This notebook produces Figure S5, Figure S6, Figure S10, Figure S11, Figure S12, Figure S13, Figure S17, and Figure S18.
