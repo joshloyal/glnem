@@ -61,9 +61,20 @@ The following commands runs the simulations and produces Table S3.
 >>> python make_table.py
 ```
 
-
 ### Section 5.5 of the supplement (Sensitivity to latent space misspecification)
 
+The following commands runs the simulations and produces Table S4, Table S5, and Table S6.
+
+```bash
+>>> python simulation_latent_space.py
+>>> cd output_latent_space/
+>>> python make_table.py distance
+>>> python make_table.py distance_sq
+>>> python make_table.py bilinear
+>>> python coef_recovery_table.py distance
+>>> python coef_recovery_table.py distance_sq
+>>> python coef_recovery_table.py bilinear
+```
 
 ### Section 7.1 of the supplement (Protein-Protein interaction network)
 
