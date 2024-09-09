@@ -102,7 +102,7 @@ plt.savefig("nb_diag.png", dpi=600, bbox_inches='tight')
 
 <img src="images/nb_diag.png" width="100%" />
 
-The posterior overwhelmingly favors a $d = 1$ dimensional model.
+The posterior favors a $d = 1$ dimensional model.
 
 Simulation Studies and Real-Data Applications
 ---------------------------------------------
