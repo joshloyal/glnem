@@ -6,7 +6,7 @@
 
 This package provides an interface for the model described in
 "A spike-and-slab prior for dimension selection in generalized linear network eigenmodels." Inference is performed using
-a Hamiltonian-within-Gibbs algorithm. For more details, see [Loyal (2024)]().
+a Hamiltonian-within-Gibbs algorithm. For more details, see [Loyal (2024)](https://arxiv.org/abs/2309.11654).
 
 Dependencies
 ------------
