@@ -19,11 +19,6 @@ exec(open(os.path.join(HERE, 'glnem', 'version.py')).read())
 with open('requirements.txt') as f:
     INSTALL_REQUIRES = [l.strip() for l in f.readlines() if l]
 
-
-with open('test_requirements.txt') as f:
-    TEST_REQUIRES = [l.strip() for l in f.readlines() if l]
-
-
 try:
     import numpy
 except ImportError:
@@ -181,9 +176,6 @@ def setup_package():
             include_package_data=True,
             packages=find_packages(),
             install_requires=INSTALL_REQUIRES,
-            extras_require={'test': TEST_REQUIRES},
-            setup_requires=['pytest-runner'],
-            tests_require=TEST_REQUIRES,
             ext_modules=ext_modules
         )
 if __name__ == '__main__':
