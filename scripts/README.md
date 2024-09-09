@@ -41,13 +41,14 @@ This notebook produces Figure 3, Figure S7, Figure S8, and Figure S15.
 
 ### Section 5.3 of the supplement (Sensitivity to zero-inflation)
 
-The following commands runs the simulations and produce Figure 7(a).
+The following commands runs the simulations and produce Figure S1, Table S1, and Table S2.
 
 ```bash
->>> python simulation_nonedge_sensitivity.py
->>> cd output_nonedge_sensitivty/
->>> python process.py
->>> python plot.py
+>>> python simulation_zero_inflation.py
+>>> cd output_zero_inflation/
+>>> python make_dim_heatmaps.py
+>>> python parameter_recovery_table.py
+>>> python coef_recovery_table.py
 ```
 
 ### Section 5.4 of the supplement (Sensitivity to heavy-tailed distributions)
