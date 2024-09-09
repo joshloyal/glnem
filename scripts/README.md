@@ -6,16 +6,15 @@ Simulation and real data analysis scripts. The code was original written to run 
 
 The following commands run the simulations or real data analysis and produce the figures in the corresponding section.
 
-### Section 6.2 and Section 5.6 of the supplement (Parameter Recovery)
+### Section 6.2 and Section 6.3 (Parameter Recovery and Dimension Selection)
 
-These commands run the simulations and produce Figure 1 and Figure 2.
+These commands run the simulations and produce Table 1, Figure 1, and Figure 2.
 
 ```bash
->>> python simulation_recovery.py
->>> cd output_parameter_recovery/
->>> python process.py
->>> python plot_nodes.py
->>> python plot_time.py
+>>> python simulation_recovery_dim_select.py
+>>> cd output_recovery_dim_select/
+>>> python parameter_recovery_table.py   
+>>> python plot_dim_heatmaps.py        
 ```
 
 ### Section 6.3 and Section 5.6 of the supplement (Dimension selection)
