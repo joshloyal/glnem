@@ -46,7 +46,7 @@ The following commands runs the simulations and produces Figure S1, Table S1, an
 ```bash
 >>> python simulation_zero_inflation.py
 >>> cd output_zero_inflation/
->>> python make_dim_heatmaps.py
+>>> python plot_dim_heatmaps.py
 >>> python parameter_recovery_table.py
 >>> python coef_recovery_table.py
 ```
