@@ -17,16 +17,16 @@ These commands run the simulations and produce Table 1, Figure 1, and Figure 2.
 >>> python plot_dim_heatmaps.py        
 ```
 
-### Section 6.3 and Section 5.6 of the supplement (Dimension selection)
+### Section 5.6 of the supplement (Sensitivity to d)
 
-These commands run the simulations and produces Table 1.
+These commands run the simulations and produce Figure S2, Table S7, and Table S8
 
 ```bash
->>> python simulation_comparison.py
->>> python simulation_fase.py
->>> cd output_comparison/
->>> python process.py
->>> python print_results.py
+>>> python simulation_recovery_dim_select_sensitivity.py
+>>> cd output_recovery_dim_select_sensitivity/
+>>> python plot_dim_heatmaps.py
+>>> python parameter_recovery_table.py 6
+>>> python parameter_recovery_table.py 12
 ```
 
 ### Section 7 and BLANK (Banana Trade Network Analysis)
